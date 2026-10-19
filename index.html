@@ -210,11 +210,132 @@ section.v.on { display: block; }
 }
 .diagram-box svg { max-width: 100%; height: auto; }
 footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13px; line-height: 1.6; }
-@media(max-width: 820px) {
-  .card { position: static; width: auto; border-radius: 20px; margin-top: 10px; }
-  .tut { position: static; width: auto; border-radius: 20px; margin-bottom: 10px; }
-  .cam-help { display: none; }
-  #gl { aspect-ratio: 4/3; min-height: 380px; }
+
+.card-handle { display: none; }
+
+@media (max-width: 768px) {
+  .wrap { padding: 10px 10px 24px; }
+  header { margin-bottom: 8px; gap: 8px; flex-direction: column; align-items: stretch; }
+  h1 { font-size: 19px; gap: 6px; justify-content: space-between; }
+  .badge-fps { font-size: 11px; padding: 2px 7px; }
+  .sub { font-size: 12px; line-height: 1.35; }
+
+  #tabs {
+    width: 100%;
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 3px;
+    gap: 3px;
+  }
+  #tabs::-webkit-scrollbar { display: none; }
+  #tabs button {
+    font-size: 12px;
+    padding: 6px 8px;
+    white-space: nowrap;
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .bar {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+    align-items: stretch;
+  }
+  .bar-group {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+    white-space: nowrap;
+    width: 100%;
+  }
+  .bar-group::-webkit-scrollbar { display: none; }
+  .pills { padding: 2px; flex-shrink: 0; }
+  .pills button, .btn { font-size: 12px; padding: 5px 9px; gap: 4px; flex-shrink: 0; }
+
+  .map { border-radius: 20px; }
+  #gl { aspect-ratio: unset; height: clamp(330px, 46vh, 420px); min-height: 330px; }
+
+  /* Mobile Station Bottom Sheet */
+  .card {
+    position: absolute;
+    left: 8px; right: 8px; bottom: 8px; top: auto;
+    width: auto;
+    max-height: 65vh;
+    overflow-y: auto;
+    border-radius: 22px;
+    padding: 14px 16px;
+    box-shadow: 0 12px 35px rgba(0,0,0,0.4);
+    z-index: 20;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+  .card-handle {
+    display: block;
+    width: 38px; height: 4px; border-radius: 4px;
+    background: rgba(128,128,128,0.35);
+    margin: 0 auto 10px;
+  }
+  .card h3 { font-size: 14.5px; }
+  .card label { font-size: 12px; margin-top: 8px; }
+  .ch button { font-size: 11px; padding: 6px 2px; }
+
+  /* Mobile Tutorial Floating Card */
+  .tut {
+    position: absolute;
+    left: 8px; right: 8px; top: 8px; bottom: auto;
+    width: auto;
+    max-height: 52vh;
+    overflow-y: auto;
+    padding: 13px 15px;
+    border-radius: 18px;
+    z-index: 12;
+    box-shadow: 0 12px 35px rgba(0,0,0,0.35);
+  }
+  .tut h3 { font-size: 15px; }
+  .tut p { font-size: 12.5px; margin-bottom: 8px; }
+  .tut .concept-box { font-size: 11.5px; padding: 6px 10px; margin-bottom: 8px; }
+  .tut-badge { font-size: 10px; }
+  .tf button { font-size: 11.5px; padding: 5px 10px; }
+
+  /* Floating Ray Inspector HUD */
+  .ray-hud {
+    min-width: 180px;
+    padding: 8px 11px;
+    font-size: 11px;
+    border-radius: 13px;
+  }
+  .ray-hud .rh-title { font-size: 12px; }
+
+  /* Cam Help & Hint */
+  .cam-help {
+    left: 8px; bottom: 8px; font-size: 10.5px; padding: 4px 8px; border-radius: 10px;
+    max-width: calc(100% - 16px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .hint { font-size: 11.5px; padding: 6px 12px; bottom: 8px; }
+
+  /* Compact 2x2 Stats Grid */
+  .stats { grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .st { padding: 9px 12px; border-radius: 16px; }
+  .st small { font-size: 10.5px; }
+  .st b { font-size: 19px; }
+  .st i { font-size: 10.5px; }
+  .stars { font-size: 18px; letter-spacing: 1px; }
+  .leg-labels { font-size: 8.5px; }
+
+  /* Theory and Methodology */
+  .txt { grid-template-columns: 1fr; gap: 10px; }
+  .txt article { padding: 14px 16px; border-radius: 18px; }
+  .txt h2 { font-size: 16px; }
+  .txt p, .txt li { font-size: 13.5px; }
+  .f { font-size: 12px; padding: 7px 10px; }
+  footer { margin-top: 18px; font-size: 11.5px; }
 }
 </style>
 </head>
@@ -230,8 +351,8 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
   </div>
   <nav class="pills g" id="tabs">
     <button class="on" data-t="game">🎮 Симулятор</button>
-    <button data-t="theory">📡 Теория (с картинками)</button>
-    <button data-t="method">📐 Методика расчёта</button>
+    <button data-t="theory">📡 Теория</button>
+    <button data-t="method">📐 Методика</button>
   </nav>
 </header>
 
@@ -240,14 +361,14 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
     <div class="bar-group">
       <div class="pills g" id="lvl"></div>
       <div class="pills g" id="lay">
-        <button class="on" data-l="rsrp" title="Мощность принимаемого сигнала (дБм)">📶 Сила (RSRP)</button>
-        <button data-l="sinr" title="Отношение сигнал / шум+помеха (дБ)">⚡ Качество (SINR)</button>
+        <button class="on" data-l="rsrp" title="Мощность принимаемого сигнала (дБм)">📶 RSRP</button>
+        <button data-l="sinr" title="Отношение сигнал / шум+помеха (дБ)">⚡ SINR</button>
       </div>
     </div>
     <div class="bar-group">
       <div class="pills g" id="view">
         <button class="on" data-v="3d">3D</button>
-        <button data-v="top">Сверху</button>
+        <button data-v="top">2D</button>
         <button data-v="orbit" id="btnOrbit">🚁 Облёт</button>
       </div>
       <button class="btn on" id="btnLive" title="Абоненты двигаются по улицам и переключаются между вышками">🚶 Трафик</button>
@@ -262,7 +383,7 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
     <div id="gl" aria-label="Интерактивный 3D-город"></div>
     <div class="ray-hud" id="rayHud"></div>
     <div class="hint g" id="hint">💡 <b>Кликни по карте</b>, чтобы поставить базовую станцию · <b>Тяни мышью</b> для вращения 3D</div>
-    <div class="cam-help g">🖱 <b>ЛКМ + движение:</b> вращать 3D · <b>Клик:</b> поставить/выбрать БС · <b>Колесо/щипок:</b> зум</div>
+    <div class="cam-help g" id="camHelp">🖱 <b>ЛКМ + движение:</b> вращать 3D · <b>Клик:</b> поставить/выбрать БС · <b>Колесо/щипок:</b> зум</div>
     
     <!-- Interactive Onboarding Modal inside Map -->
     <div class="tut g" id="tut"></div>
@@ -442,7 +563,12 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 const $ = s => document.querySelector(s);
-const W = 900, H = 600, C = 6, GW = 150, GH = 100, KM = 0.008, N0 = -97, F = 1800, LF = Math.log10(F);
+const isMobile = window.innerWidth <= 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+const W = 900, H = 600;
+const GW = isMobile ? 90 : 150;
+const GH = isMobile ? 60 : 100;
+const C = W / GW;
+const KM = 0.008, N0 = -97, F = 1800, LF = Math.log10(F);
 
 const LV = [
   { n: '🏡 Село', b: 14, u: 50, bud: 100, sd: 3 },
@@ -659,20 +785,29 @@ function updateStats(ok, sum) {
 
 function renderPanel() {
   const c = $('#card');
-  if (sel == null || !S[sel]) { c.className = 'card g'; return; }
+  if (sel == null || !S[sel]) {
+    c.className = 'card g';
+    if (ts < TS.length) renderTutorial();
+    return;
+  }
   const s = S[sel];
   c.className = 'card g on';
+  $('#tut').style.display = 'none';
   c.innerHTML = `
+    <div class="card-handle"></div>
     <h3>
       <span>📡 Базовая станция #${sel + 1}</span>
-      <button class="btn danger" id="del" style="padding:4px 10px">✕ Удалить</button>
+      <div style="display:flex;gap:5px;align-items:center">
+        <button class="btn danger" id="del" style="padding:4px 8px;font-size:12px" title="Удалить станцию">🗑</button>
+        <button class="btn" id="closeCard" style="padding:4px 10px;font-size:12px" title="Закрыть панель">✕</button>
+      </div>
     </h3>
     <div class="cost-tag"><span>Стоимость станции:</span><b id="stCost">${cost(s).toFixed(1)} тыс. $</b></div>
     <label>Мощность передатчика <b>${s.p} дБм</b></label>
     <input type="range" min="30" max="46" value="${s.p}" data-k="p">
     <label>Высота мачты (огибание домов) <b>${s.h} м</b></label>
     <input type="range" min="15" max="60" value="${s.h}" data-k="h">
-    <label style="align-items:center;margin-top:12px;cursor:pointer">
+    <label style="align-items:center;margin-top:10px;cursor:pointer">
       <span>Направленные 3 сектора (3×120°)</span>
       <input type="checkbox" id="sec" ${s.sec ? 'checked' : ''} style="accent-color:#3b82f6;width:18px;height:18px;cursor:pointer">
     </label>
@@ -694,6 +829,7 @@ function renderPanel() {
       if (ct) ct.textContent = cost(s).toFixed(1) + ' тыс. $';
       tuned = true;
       checkTutorial();
+      syncStations3D();
       rd();
     };
   });
@@ -703,16 +839,25 @@ function renderPanel() {
       chg = true;
       checkTutorial();
       renderPanel();
+      syncStations3D();
       rd();
     };
   });
   const secEl = $('#sec');
   if (secEl) {
-    secEl.onchange = e => { s.sec = e.target.checked; tuned = true; checkTutorial(); renderPanel(); rd(); };
+    secEl.onchange = e => { s.sec = e.target.checked; tuned = true; checkTutorial(); renderPanel(); syncStations3D(); rd(); };
   }
   const delEl = $('#del');
   if (delEl) {
     delEl.onclick = deleteStation;
+  }
+  const closeEl = $('#closeCard');
+  if (closeEl) {
+    closeEl.onclick = () => {
+      sel = null;
+      renderPanel();
+      rd();
+    };
   }
 }
 
@@ -745,7 +890,7 @@ const easeOutBack = t => {
 
 const gl = $('#gl');
 const R = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-R.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+R.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio || 1, 1.5) : Math.min(window.devicePixelRatio || 1, 2));
 R.setSize(gl.clientWidth || 900, gl.clientHeight || 500);
 gl.append(R.domElement);
 
@@ -1129,7 +1274,7 @@ function updateRayInspector() {
 }
 
 // FPS Counter & High-Refresh Animation Loop
-let last = performance.now(), frames = 0, fpsTime = performance.now();
+let last = performance.now(), frames = 0, fpsTime = performance.now(), lastHeatCompute = 0;
 function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(0.05, (now - last) / 1000);
@@ -1165,7 +1310,8 @@ function loop(now) {
     });
 
     // Recalculate subscriber connections smoothly
-    if (S.length && (frames % 4 === 0)) {
+    const trafficStep = isMobile ? 6 : 4;
+    if (S.length && (frames % trafficStep === 0)) {
       let ok = 0, sum = 0;
       const connectedCount = S.map(() => 0);
       U.forEach(u => {
@@ -1194,9 +1340,13 @@ function loop(now) {
   }
 
   if (dirty) {
-    dirty = false;
-    computeHeatmapAndSubscribers();
-    syncStations3D();
+    const heatThrottle = isMobile ? 60 : 16;
+    if (now - lastHeatCompute >= heatThrottle) {
+      dirty = false;
+      lastHeatCompute = now;
+      computeHeatmapAndSubscribers();
+      syncStations3D();
+    }
   }
 
   // Smooth Camera Damping
@@ -1363,6 +1513,11 @@ el.onpointerup = e => {
   try { el.releasePointerCapture(e.pointerId); } catch (_) {}
   downPos = null;
   dragMode = null;
+  if (isMobile) {
+    hoverPt = null;
+    ghostGroup.visible = false;
+    updateRayInspector();
+  }
 };
 
 el.onpointerleave = () => {
@@ -1654,6 +1809,12 @@ $('#tutb').onclick = () => {
 };
 
 // Initialize Application
+if (isMobile) {
+  const ch = $('#camHelp');
+  if (ch) ch.innerHTML = '📱 <b>1 палец:</b> вращать · <b>Тап:</b> БС · <b>2 пальца:</b> зум';
+  const ht = $('#hint');
+  if (ht) ht.innerHTML = '💡 <b>Тапни по карте</b>, чтобы поставить вышку · <b>Вращай пальцем</b>';
+}
 applyTheme();
 setLv(0);
 renderTutorial();
