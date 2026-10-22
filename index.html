@@ -209,6 +209,202 @@ section.v.on { display: block; }
   align-items: center;
 }
 .diagram-box svg { max-width: 100%; height: auto; }
+
+/* Interactive Report (🎤 Доклад) Styles */
+.rep-header {
+  padding: 20px 24px;
+  border-radius: 24px;
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rep-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.rep-badge-prog {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--blue);
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  padding: 5px 14px;
+  border-radius: 99px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.rep-meter {
+  height: 9px;
+  border-radius: 99px;
+  background: rgba(128, 128, 128, 0.16);
+  overflow: hidden;
+  position: relative;
+}
+.rep-meter div {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #3b82f6, #10b981);
+  transition: width 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.rep-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+}
+.rep-card {
+  padding: 22px 24px;
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+.rep-card.read {
+  border-color: rgba(16, 185, 129, 0.55);
+  box-shadow: 0 10px 30px rgba(16, 185, 129, 0.12);
+}
+.rep-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.rep-tag {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 9px;
+  border-radius: 99px;
+  background: rgba(59, 130, 246, 0.14);
+  color: var(--blue);
+  display: inline-block;
+  margin-bottom: 6px;
+}
+.rep-status-pill {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: rgba(128, 128, 128, 0.15);
+  color: var(--mut);
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.rep-card.read .rep-status-pill {
+  background: rgba(16, 185, 129, 0.18);
+  color: #10b981;
+}
+.rep-analogy-box {
+  background: rgba(59, 130, 246, 0.08);
+  border-left: 3.5px solid var(--blue);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  margin: 12px 0;
+  color: var(--ink);
+}
+.rep-quiz-box {
+  background: rgba(128, 128, 128, 0.06);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin: 12px 0;
+}
+.rep-quiz-q {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--ink);
+}
+.rep-quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rep-opt-btn {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--glass-strong);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.18s ease;
+}
+.rep-opt-btn:hover {
+  background: rgba(59, 130, 246, 0.12);
+  transform: translateX(2px);
+}
+.rep-opt-btn.correct {
+  background: rgba(16, 185, 129, 0.2) !important;
+  border-color: #10b981 !important;
+  color: #10b981 !important;
+}
+.rep-opt-btn.wrong {
+  background: rgba(239, 68, 68, 0.18) !important;
+  border-color: #ef4444 !important;
+  color: #ef4444 !important;
+}
+.rep-deep-box {
+  display: none;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(128, 128, 128, 0.06);
+  border: 1px dashed rgba(128, 128, 128, 0.3);
+  font-size: 13px;
+  animation: pop .25s ease;
+}
+.rep-deep-box.open { display: block; }
+.rep-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid rgba(128, 128, 128, 0.14);
+}
+.btn-read {
+  flex: 1;
+  min-width: 140px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.btn-read.done {
+  background: rgba(16, 185, 129, 0.18);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+.rep-congrats {
+  display: none;
+  margin-top: 22px;
+  padding: 26px 22px;
+  border-radius: 24px;
+  text-align: center;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(16, 185, 129, 0.15));
+  border: 2px solid #10b981;
+  animation: pop .35s cubic-bezier(.2, 1.3, .4, 1);
+}
+.rep-congrats.on { display: block; }
+
 footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13px; line-height: 1.6; }
 
 .card-handle { display: none; }
@@ -335,6 +531,14 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
   .txt h2 { font-size: 16px; }
   .txt p, .txt li { font-size: 13.5px; }
   .f { font-size: 12px; padding: 7px 10px; }
+
+  /* Interactive Report Mobile */
+  .rep-grid { grid-template-columns: 1fr; gap: 12px; }
+  .rep-header { padding: 14px 16px; border-radius: 18px; }
+  .rep-card { padding: 16px 18px; border-radius: 20px; }
+  .rep-analogy-box { font-size: 12.5px; }
+  .rep-opt-btn { font-size: 12px; }
+
   footer { margin-top: 18px; font-size: 11.5px; }
 }
 </style>
@@ -351,6 +555,7 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
   </div>
   <nav class="pills g" id="tabs">
     <button class="on" data-t="game">🎮 Симулятор</button>
+    <button data-t="report">🎤 Доклад</button>
     <button data-t="theory">📡 Теория</button>
     <button data-t="method">📐 Методика</button>
   </nav>
@@ -414,6 +619,338 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
       <div class="stars" id="sStar">☆☆☆</div>
       <i id="sMsg">Поставь первую станцию на карту</i>
     </div>
+  </div>
+</section>
+
+<!-- ================= INTERACTIVE REPORT (ИНТЕРАКТИВНЫЙ ДОКЛАД) ================= -->
+<section class="v" id="report">
+  <!-- Interactive Report Header & Progress Tracker -->
+  <div class="rep-header g">
+    <div class="rep-header-top">
+      <div>
+        <h2 style="font-size:22px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          🎤 Интерактивный доклад: Сотовая связь простыми словами
+        </h2>
+        <div class="sub" style="margin-top:4px;">
+          Понятный путеводитель по технологиям LTE, вышкам связи, антеннам и скорости интернета. Нажимайте кнопки, проверяйте себя и отслеживайте прогресс изучения!
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span class="rep-badge-prog" id="repBadge">
+          <span>📖 Изучено:</span>
+          <b id="repCount">0 / 6</b>
+          <span id="repPct">(0%)</span>
+        </span>
+        <button class="btn" id="btnResetRep" title="Сбросить отметки о прочтении">🔄 Сбросить</button>
+      </div>
+    </div>
+    
+    <div class="rep-meter">
+      <div id="repMeterBar" style="width:0%;"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--mut);flex-wrap:wrap;gap:6px;">
+      <span id="repRank" style="font-weight:700;color:var(--ink);">🎓 Ваш статус: 🌱 Новичок в радиосвязи</span>
+      <span>6 интерактивных разделов · нажимайте «✓ Отметить как прочитано»</span>
+    </div>
+  </div>
+
+  <!-- Interactive Grid with 6 Chapters -->
+  <div class="rep-grid">
+
+    <!-- Card 1 -->
+    <article class="rep-card g" data-step="1">
+      <div class="rep-card-top">
+        <div>
+          <span class="rep-tag">Раздел 1 · Основы</span>
+          <h3 style="font-size:18px;font-weight:800;line-height:1.25;">📡 Что такое сотовая связь? Принцип невидимого фонарика</h3>
+        </div>
+        <span class="rep-status-pill">Не прочитано</span>
+      </div>
+
+      <p>
+        Каждый день миллиарды людей смотрят видео и переписываются в мессенджерах, но как именно картинка прилетает в телефон без проводов?
+        <b>Ваш смартфон и базовая станция на крыше дома — это просто два радиофонарика</b>. Они обмениваются невидимыми вспышками электромагнитных волн на частоте <b>1800 МГц</b> (1,8 миллиарда колебаний в секунду!).
+      </p>
+
+      <div class="rep-analogy-box">
+        💡 <b>Живая аналогия:</b> Передача данных — это как скоростная азбука Морзе фонариком: вышка быстро моргает, передавая нули и единицы цифрового кода, а ваш смартфон считывает эти вспышки и превращает их в фильм или звонок другу.
+      </div>
+
+      <div class="rep-quiz-box">
+        <div class="rep-quiz-q">❓ Интерактивный вопрос: Почему мы не видим этот луч глазами?</div>
+        <div class="rep-quiz-options">
+          <button class="rep-opt-btn" data-correct="false" data-hint="Не совсем. Скорость радиоволн равна скорости видимого света (300 000 км/с).">
+            1. Сигнал летит слишком быстро для человеческого глаза
+          </button>
+          <button class="rep-opt-btn" data-correct="true" data-hint="Абсолютно верно! Длина радиоволны 16,7 см намного длиннее оптического спектра (400–700 нм), поэтому сетчатка глаза её не видит.">
+            2. Длина волны (16,7 см) находится далеко за пределами видимого глазом спектра
+          </button>
+        </div>
+        <div class="rep-feedback" style="display:none;margin-top:6px;font-size:12.5px;font-weight:600;"></div>
+      </div>
+
+      <div class="rep-deep-box">
+        <b>🔬 Для будущих инженеров (Спецификация LTE):</b><br>
+        Диапазон: <b>LTE Band 3 (FDD)</b>. Длина волны радиосигнала:
+        <span class="f">λ = c / f = 3·10⁸ м/с / 1,8·10⁹ Гц ≈ 0,167 м (16,7 см)</span>
+        На этой частоте достигается золотой баланс: сигнал хорошо проникает сквозь стекла в дома и обеспечивает высокую емкость передачи данных.
+      </div>
+
+      <div class="rep-actions">
+        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Технические детали</button>
+        <button class="btn btn-read" data-id="1">
+          <span class="check-icon">○</span> Отметить как прочитано
+        </button>
+      </div>
+    </article>
+
+    <!-- Card 2 -->
+    <article class="rep-card g" data-step="2">
+      <div class="rep-card-top">
+        <div>
+          <span class="rep-tag">Раздел 2 · Препятствия</span>
+          <h3 style="font-size:18px;font-weight:800;line-height:1.25;">🧱 Почему пропадает связь за домами? Радиотень</h3>
+        </div>
+        <span class="rep-status-pill">Не прочитано</span>
+      </div>
+
+      <p>
+        В чистом поле радиоволна летит далеко, но в городе на её пути вырастают железобетонные многоэтажки. Металлическая арматура и бетон действуют на радиоволну как светонепроницаемые глухие шторы.
+        Каждое здание на пути луча <b>отнимает по 5 дБ мощности</b> (сигнал становится слабее более чем в 3 раза за каждый дом!).
+      </p>
+
+      <div class="rep-analogy-box">
+        💡 <b>Живая аналогия:</b> Если встать за угол массивного дома, вы окажетесь в «тени» от фонарика. В сотовой связи это называют <b>радиотенью</b>. Уровень сигнала (RSRP) падает ниже −105 дБм, и видео начинает бесконечно буферизоваться.
+      </div>
+
+      <div class="rep-quiz-box">
+        <div class="rep-quiz-q">❓ Инженерный вопрос: Как помочь абонентам, которых закрыл соседний дом?</div>
+        <div class="rep-quiz-options">
+          <button class="rep-opt-btn" data-correct="true" data-hint="Идеально! Подняв мачту (с 15 до 45–60 м), радиоволна огибает крыши по закону дифракции (модель COST-231 Hata).">
+            1. Увеличить высоту антенной мачты (с 15 до 40–60 м), чтобы перешагнуть крыши
+          </button>
+          <button class="rep-opt-btn" data-correct="false" data-hint="Просто увеличивать мощность в 10 раз невыгодно — передатчик перегреется, а бетон все равно поглотит сигнал. Гораздо эффективнее поднять мачту!">
+            2. Просто сделать передатчик в 10 раз мощнее
+          </button>
+        </div>
+        <div class="rep-feedback" style="display:none;margin-top:6px;font-size:12.5px;font-weight:600;"></div>
+      </div>
+
+      <div class="rep-deep-box">
+        <b>🔬 Модель COST-231 Hata (Urban):</b><br>
+        Европейская формула учитывает высоту антенны $h_b$ и дифракцию на кромках крыш:
+        <span class="f">L_Hata = 46,3 + 33,9·lg(f) − 13,82·lg(h_b) + (44,9 − 6,55·lg(h_b))·lg(d) + 3</span>
+        Чем выше подвешена антенна ($h_b$), тем меньше суммарные потери на километре трассы.
+      </div>
+
+      <div class="rep-actions">
+        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Технические детали</button>
+        <button class="btn btn-read" data-id="2">
+          <span class="check-icon">○</span> Отметить как прочитано
+        </button>
+      </div>
+    </article>
+
+    <!-- Card 3 -->
+    <article class="rep-card g" data-step="3">
+      <div class="rep-card-top">
+        <div>
+          <span class="rep-tag">Раздел 3 · Секторизация</span>
+          <h3 style="font-size:18px;font-weight:800;line-height:1.25;">🍕 Зачем на вышке 3 антенны вместо одной?</h3>
+        </div>
+        <span class="rep-status-pill">Не прочитано</span>
+      </div>
+
+      <p>
+        Обычная антенна светит во все стороны тускло (всенаправленная лампа). Но на реальных базовых станциях устанавливают <b>3 направленные секторные антенны</b>. Каждая антенна бьет своим сфокусированным лучом шириной $65^\circ$ и обслуживает сектор в $120^\circ$.
+      </p>
+
+      <div class="rep-analogy-box">
+        💡 <b>Живая аналогия:</b> Представьте круглую пиццу, разрезанную на 3 куска. Теперь станция делит нагрузку: на каждом куске работает свой независимый радиопередатчик! Это втрое увеличивает число людей, которые могут одновременно сидеть в сети без потери скорости.
+      </div>
+
+      <div class="rep-quiz-box">
+        <div class="rep-quiz-q">❓ Почему нельзя поставить 1 сектор на весь город?</div>
+        <div class="rep-quiz-options">
+          <button class="rep-opt-btn" data-correct="true" data-hint="Верно! Полоса частот ограничена (10 МГц). Если подключить всех к одной антенне, емкость закончится. 3 сектора утраивают общую пропускную способность!">
+            1. Емкость одной антенны разделится на всех жителей и упадет до нуля
+          </button>
+          <button class="rep-opt-btn" data-correct="false" data-hint="Радиоволны отлично распространяются в любую сторону, но ресурс частоты в эфире жестко ограничен.">
+            2. Радиоволны физически не умеют летать назад
+          </button>
+        </div>
+        <div class="rep-feedback" style="display:none;margin-top:6px;font-size:12.5px;font-weight:600;"></div>
+      </div>
+
+      <div class="rep-deep-box">
+        <b>🔬 Диаграмма направленности 3GPP (17 dBi):</b><br>
+        Мощность максимальна строго по центру луча и спадает к краям сектора:
+        <span class="f">A(θ) = −min[ 12 · (θ / 65°)², 20 ] дБ</span>
+        В симуляторе вы можете регулировать азимут (0–119°), направляя лучи вдоль центральных проспектов и площадей!
+      </div>
+
+      <div class="rep-actions">
+        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Технические детали</button>
+        <button class="btn btn-read" data-id="3">
+          <span class="check-icon">○</span> Отметить как прочитано
+        </button>
+      </div>
+    </article>
+
+    <!-- Card 4 -->
+    <article class="rep-card g" data-step="4">
+      <div class="rep-card-top">
+        <div>
+          <span class="rep-tag">Раздел 4 · Интерференция</span>
+          <h3 style="font-size:18px;font-weight:800;line-height:1.25;">⚡ Шумная вечеринка: Враг №1 сотовой связи</h3>
+        </div>
+        <span class="rep-status-pill">Не прочитано</span>
+      </div>
+
+      <p>
+        Самое частое заблуждение: «Поставим вышки через каждые 50 метров на полную мощность — и интернет будет летать».
+        Если две соседние вышки работают на <b>одной частоте (например, обе на Канале 1, синий цвет)</b>, их радиоволны сталкиваются. Смартфон слышит обе станции одновременно и не понимает ни одну!
+      </p>
+
+      <div class="rep-analogy-box">
+        💡 <b>Живая аналогия:</b> Представьте шумную вечеринку, где два человека одновременно кричат вам в оба уха разные фразы с одинаковой силой. Громкость огромная, но разобрать слова невозможно. В радиосвязи этот шум называют <b>интерференцией</b>.
+      </div>
+
+      <div class="rep-quiz-box">
+        <div class="rep-quiz-q">❓ Как инженеры сотовых операторов побеждают эту проблему?</div>
+        <div class="rep-quiz-options">
+          <button class="rep-opt-btn" data-correct="true" data-hint="Браво! В симуляторе это наглядно показано цветами: Канал 1 (синий), Канал 2 (оранжевый), Канал 3 (фиолетовый). Соседние вышки говорят на разных частотах и не мешают друг другу!">
+            1. Разводят соседние вышки по разным частотным каналам (Frequency Reuse)
+          </button>
+          <button class="rep-opt-btn" data-correct="false" data-hint="Выключение фильтрации сделает шум невыносимым, и передача данных остановится.">
+            2. Выключают фильтрацию шума в смартфонах
+          </button>
+        </div>
+        <div class="rep-feedback" style="display:none;margin-top:6px;font-size:12.5px;font-weight:600;"></div>
+      </div>
+
+      <div class="rep-deep-box">
+        <b>🔬 Отношение сигнал / (шум + помеха) — SINR:</b><br>
+        Чистота радиоэфира определяет, сколько бит информации можно закодировать в одной посылке:
+        <span class="f">SINR = P_сигнала − 10·lg( I_помехи + 10^(-97/10) ) дБ</span>
+        Если помеха от соседа велика ($I \ge P$), SINR падает ниже 0 дБ, связь рвется, даже если индикатор антенны на телефоне полный!
+      </div>
+
+      <div class="rep-actions">
+        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Технические детали</button>
+        <button class="btn btn-read" data-id="4">
+          <span class="check-icon">○</span> Отметить как прочитано
+        </button>
+      </div>
+    </article>
+
+    <!-- Card 5 -->
+    <article class="rep-card g" data-step="5">
+      <div class="rep-card-top">
+        <div>
+          <span class="rep-tag">Раздел 5 · Скорость интернета</span>
+          <h3 style="font-size:18px;font-weight:800;line-height:1.25;">🚀 Откуда берется скорость? Закон Шеннона</h3>
+        </div>
+        <span class="rep-status-pill">Не прочитано</span>
+      </div>
+
+      <p>
+        Почему глубокой ночью интернет скачивает файл за секунду, а в час пик или на стадионе еле открывает страницу?
+        Предельную скорость беспроводной передачи данных в 1948 году открыл американский математик <b>Клод Шеннон</b>.
+      </p>
+
+      <div class="rep-analogy-box">
+        💡 <b>Живая аналогия:</b> Скорость соты — это как пропускная способность автомагистрали. Ширина дороги — это полоса частот (у нас 10 МГц). Качество асфальта — это чистота эфира (SINR). Но вся эта скорость <b>делится поровну между всеми людьми</b>, подключенными к сектору прямо сейчас!
+      </div>
+
+      <div class="rep-quiz-box">
+        <div class="rep-quiz-q">❓ Почему на концерте интернет работает медленнее, чем дома?</div>
+        <div class="rep-quiz-options">
+          <button class="rep-opt-btn" data-correct="true" data-hint="Точно в цель! Емкость соты делится на сотни активных абонентов вокруг сцены, поэтому на каждого приходятся считанные килобиты.">
+            1. Сотни людей в одном секторе одновременно делят общую ёмкость соты
+          </button>
+          <button class="rep-opt-btn" data-correct="false" data-hint="Громкая музыка никак не влияет на радиоволны 1800 МГц. Дело только в математике распределения емкости по Шеннону!">
+            2. Музыка глушит радиоволны в воздухе
+          </button>
+        </div>
+        <div class="rep-feedback" style="display:none;margin-top:6px;font-size:12.5px;font-weight:600;"></div>
+      </div>
+
+      <div class="rep-deep-box">
+        <b>🔬 Формула Шеннона для соты LTE:</b><br>
+        <span class="f">C = B · log₂(1 + 10^(SINR/10)),   R_абонента = 0,75 · C / N_абонентов_сектора</span>
+        При ширине канала $B = 10\text{ МГц}$ и чистом эфире сектор выдает суммарно около 45–60 Мбит/с. Если в секторе 10 человек — каждый получает комфортные 4.5 Мбит/с!
+      </div>
+
+      <div class="rep-actions">
+        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Технические детали</button>
+        <button class="btn btn-read" data-id="5">
+          <span class="check-icon">○</span> Отметить как прочитано
+        </button>
+      </div>
+    </article>
+
+    <!-- Card 6 -->
+    <article class="rep-card g" data-step="6">
+      <div class="rep-card-top">
+        <div>
+          <span class="rep-tag">Раздел 6 · Инженерная победа</span>
+          <h3 style="font-size:18px;font-weight:800;line-height:1.25;">🏆 Баланс бюджета: Как получить высший балл (3★)?</h3>
+        </div>
+        <span class="rep-status-pill">Не прочитано</span>
+      </div>
+
+      <p>
+        В реальной жизни каждая вышка связи стоит круглую сумму: аренда крыши, мачта, передатчики, кабели и обслуживание ($12–45 тыс. $). Оператор не может тратить деньги бесконечно.
+        <b>Задача инженера — найти идеальный баланс качества и экономии</b>:
+      </p>
+
+      <div class="rep-analogy-box">
+        🎯 <b>Критерии победы в нашем 3D-симуляторе:</b><br>
+        1. <b>★ Зачёт:</b> Покрыть не менее 90% абонентов в рамках бюджета.<br>
+        2. <b>★★ Инженер:</b> Покрытие ≥ 90% + средняя скорость на абонента ≥ 2.5 Мбит/с.<br>
+        3. <b>★★★ Мастер радиопланирования:</b> Покрытие ≥ 90%, скорость ≥ 3.5 Мбит/с и экономия бюджета (потрачено не более 90% лимита)!
+      </div>
+
+      <div class="rep-quiz-box">
+        <div class="rep-quiz-q">❓ Готовы ли вы применить знания на практике прямо в 3D?</div>
+        <div class="rep-quiz-options">
+          <button class="rep-opt-btn" data-correct="true" data-hint="Поехали! Вы полностью освоили теорию и теперь понимаете сотовую связь как настоящий инженер!">
+            1. Да! Я готов расставить базовые станции и построить идеальную сеть!
+          </button>
+        </div>
+        <div class="rep-feedback" style="display:none;margin-top:6px;font-size:12.5px;font-weight:600;"></div>
+      </div>
+
+      <div class="rep-deep-box">
+        <b>🔬 Экономическая модель проекта:</b><br>
+        <span class="f">Cost = 12 + (h_b − 15)·0,3 + (P_tx − 30)·0,5 + [12 при 3 секторах] тыс. $</span>
+        Управляйте высотой мачт и мощностью передатчиков рационально, чтобы получить высшую оценку!
+      </div>
+
+      <div class="rep-actions">
+        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Технические детали</button>
+        <button class="btn btn-read" data-id="6">
+          <span class="check-icon">○</span> Отметить как прочитано
+        </button>
+      </div>
+    </article>
+
+  </div>
+
+  <!-- Congratulations Banner on 100% completion -->
+  <div class="rep-congrats g" id="repCongrats">
+    <div style="font-size:44px;margin-bottom:8px;">🎓 🎉 📡</div>
+    <h3 style="font-size:24px;font-weight:800;color:#10b981;margin-bottom:8px;">
+      Поздравляем! Вы полностью освоили интерактивный доклад!
+    </h3>
+    <p style="max-width:650px;margin:0 auto 16px;color:var(--mut);font-size:14.5px;line-height:1.55;">
+      Вы изучили принципы распространения радиоволн, диаграммы секторных антенн, подавление интерференции и формулу Шеннона.
+      Теперь покажите класс на практике — запустите 3D-симулятор и постройте сеть на высший балл <b>три звезды (★★★)</b>!
+    </p>
+    <button class="btn pri" id="btnGoToGame" style="padding:11px 26px;font-size:15px;box-shadow:0 6px 20px rgba(37,99,235,0.4);">
+      🚀 Перейти в 3D-симулятор и построить сеть
+    </button>
   </div>
 </section>
 
@@ -1808,6 +2345,151 @@ $('#tutb').onclick = () => {
   renderTutorial();
 };
 
+// ================= INTERACTIVE REPORT (ДОКЛАД) =================
+function initInteractiveReport() {
+  const STORAGE_KEY = 'vitalilabs_rep_read';
+  let repState = [];
+  try {
+    repState = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  } catch (_) { repState = []; }
+
+  const cards = document.querySelectorAll('.rep-card');
+  const countEl = $('#repCount');
+  const pctEl = $('#repPct');
+  const barEl = $('#repMeterBar');
+  const rankEl = $('#repRank');
+  const congratsEl = $('#repCongrats');
+  const total = cards.length || 6;
+
+  function updateUI() {
+    const readCount = repState.length;
+    const pct = Math.min(100, Math.round((readCount / total) * 100));
+    if (countEl) countEl.textContent = `${readCount} / ${total}`;
+    if (pctEl) pctEl.textContent = `(${pct}%)`;
+    if (barEl) barEl.style.width = `${pct}%`;
+
+    const ranks = [
+      '🌱 Новичок в радиосвязи',
+      '🌱 Новичок в радиосвязи',
+      '⚡ Студент радиотехники',
+      '⚡ Студент радиотехники',
+      '🗼 Инженер базовых станций',
+      '🗼 Старший инженер сети',
+      '🏆 Мастер радиопланирования! 100% готовность 🎓'
+    ];
+    if (rankEl) rankEl.textContent = '🎓 Ваш статус: ' + (ranks[readCount] || ranks[0]);
+
+    cards.forEach(card => {
+      const stepId = +card.dataset.step;
+      const isRead = repState.includes(stepId);
+      card.classList.toggle('read', isRead);
+      const pill = card.querySelector('.rep-status-pill');
+      if (pill) {
+        pill.textContent = isRead ? '✓ Прочитано' : 'Не прочитано';
+      }
+      const btn = card.querySelector('.btn-read');
+      if (btn) {
+        btn.classList.toggle('done', isRead);
+        btn.innerHTML = isRead
+          ? '<span class="check-icon" style="color:#10b981;font-weight:bold;">✓</span> Изучено!'
+          : '<span class="check-icon">○</span> Отметить как прочитано';
+      }
+    });
+
+    if (congratsEl) {
+      congratsEl.classList.toggle('on', readCount === total);
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(repState));
+    } catch (_) {}
+  }
+
+  // Toggle read status on button click
+  document.querySelectorAll('.btn-read').forEach(btn => {
+    btn.onclick = () => {
+      const id = +btn.dataset.id;
+      if (repState.includes(id)) {
+        repState = repState.filter(x => x !== id);
+      } else {
+        repState.push(id);
+      }
+      updateUI();
+    };
+  });
+
+  // Deep dive formula toggle
+  document.querySelectorAll('.btn-deep').forEach(btn => {
+    btn.onclick = () => {
+      const card = btn.closest('.rep-card');
+      const box = card ? card.querySelector('.rep-deep-box') : null;
+      if (!box) return;
+      const isOpen = box.classList.toggle('open');
+      btn.textContent = isOpen ? '🔼 Скрыть формулы' : '🔬 Технические детали';
+    };
+  });
+
+  // Interactive Quiz options
+  document.querySelectorAll('.rep-opt-btn').forEach(btn => {
+    btn.onclick = () => {
+      const box = btn.closest('.rep-quiz-box');
+      if (!box) return;
+      const isCorrect = btn.dataset.correct === 'true';
+      const feedback = box.querySelector('.rep-feedback');
+      const hint = btn.dataset.hint || '';
+
+      box.querySelectorAll('.rep-opt-btn').forEach(b => {
+        b.classList.remove('correct', 'wrong');
+      });
+
+      if (isCorrect) {
+        btn.classList.add('correct');
+        if (feedback) {
+          feedback.style.display = 'block';
+          feedback.style.color = '#10b981';
+          feedback.innerHTML = '🎉 ' + hint;
+        }
+        // Auto mark step as read
+        const card = btn.closest('.rep-card');
+        if (card) {
+          const stepId = +card.dataset.step;
+          if (!repState.includes(stepId)) {
+            repState.push(stepId);
+            updateUI();
+          }
+        }
+      } else {
+        btn.classList.add('wrong');
+        if (feedback) {
+          feedback.style.display = 'block';
+          feedback.style.color = '#ef4444';
+          feedback.innerHTML = '❌ ' + hint;
+        }
+      }
+    };
+  });
+
+  // Reset Progress
+  const btnReset = $('#btnResetRep');
+  if (btnReset) {
+    btnReset.onclick = () => {
+      repState = [];
+      updateUI();
+    };
+  }
+
+  // Go to game from congrats banner
+  const btnGoToGame = $('#btnGoToGame');
+  if (btnGoToGame) {
+    btnGoToGame.onclick = () => {
+      document.querySelectorAll('.v').forEach(v => v.classList.toggle('on', v.id === 'game'));
+      [...$('#tabs').children].forEach(b => b.classList.toggle('on', b.dataset.t === 'game'));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+  }
+
+  updateUI();
+}
+
 // Initialize Application
 if (isMobile) {
   const ch = $('#camHelp');
@@ -1818,6 +2500,7 @@ if (isMobile) {
 applyTheme();
 setLv(0);
 renderTutorial();
+initInteractiveReport();
 requestAnimationFrame(loop);
 </script>
 </body>
