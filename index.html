@@ -78,9 +78,17 @@ body.night .badge-fps { background: rgba(34, 197, 94, 0.18); color: #4ade80; }
 .bar-group { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
 
 .map { position: relative; border-radius: 26px; overflow: hidden; touch-action: none; border: 1px solid var(--line); }
-#gl { aspect-ratio: 16/9; min-height: 480px; width: 100%; cursor: grab; position: relative; }
+#gl { aspect-ratio: 16/9; min-height: 480px; width: 100%; cursor: grab; position: relative; touch-action: none; }
 #gl:active { cursor: grabbing; }
-canvas { display: block; width: 100%; height: 100%; }
+#gl::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: 26px;
+  background: radial-gradient(ellipse at 50% 50%, transparent 64%, rgba(5, 8, 18, 0.40) 100%);
+  z-index: 2; transition: opacity 0.4s ease;
+}
+body:not(.night) #gl::after {
+  background: radial-gradient(ellipse at 50% 50%, transparent 72%, rgba(15, 23, 42, 0.16) 100%);
+}
+canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
 /* 3D Floating Inspector Tooltip */
 .ray-hud {
@@ -485,15 +493,22 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
   }
   .bar-group {
     display: flex;
-    gap: 5px;
+    flex-wrap: nowrap !important;
+    gap: 6px;
     overflow-x: auto;
+    overflow-y: hidden;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 2px;
+    padding-bottom: 4px;
     white-space: nowrap;
     width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
   }
   .bar-group::-webkit-scrollbar { display: none; }
+  .bar-group > * { flex-shrink: 0; }
   .pills { padding: 2px; flex-shrink: 0; }
   .pills button, .btn { font-size: 12px; padding: 5px 9px; gap: 4px; flex-shrink: 0; }
 
@@ -606,7 +621,7 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
   <div>
     <h1>
       Планировщик сотовой сети 3D
-      <span class="badge-fps" id="fpsBadge">120 FPS · 3D</span>
+      <span class="badge-fps" id="fpsBadge">144 FPS · 3D</span>
     </h1>
     <div class="sub">Интерактивный симулятор радиопокрытия, секторов антенн и интерференции (1800 МГц)</div>
   </div>
@@ -644,7 +659,16 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
 
   <div class="map g" id="map">
     <div id="gl" aria-label="Интерактивный 3D-город"></div>
-    <div class="ray-hud" id="rayHud"></div>
+    <div class="ray-hud" id="rayHud">
+      <div class="rh-title">
+        <span id="rhTitle">Станция #1</span>
+        <span id="rhStatus">● На связи</span>
+      </div>
+      <div class="rh-row"><span>Сила сигнала (RSRP):</span><b id="rhRsrp">-85 дБм</b></div>
+      <div class="rh-row"><span>Чистота (SINR):</span><b id="rhSinr">14.2 дБ</b></div>
+      <div class="rh-row"><span>Дистанция:</span><b id="rhDist">180 м</b></div>
+      <div class="rh-tip" id="rhTip" style="display:none;"></div>
+    </div>
     <div class="hint g" id="hint">💡 <b>Кликни по карте</b>, чтобы поставить базовую станцию · <b>Тяни мышью</b> для вращения 3D</div>
     <div class="cam-help g" id="camHelp">🖱 <b>ЛКМ + движение:</b> вращать 3D · <b>Клик:</b> поставить/выбрать БС · <b>Колесо/щипок:</b> зум</div>
     
@@ -1168,11 +1192,61 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
 <script>
 const $ = s => document.querySelector(s);
 const isMobile = window.innerWidth <= 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-const W = 900, H = 600;
+const W = 900, H = 600, W_HALF = 450, H_HALF = 300;
 const GW = isMobile ? 90 : 150;
 const GH = isMobile ? 60 : 100;
 const C = W / GW;
+const INV_C = 1 / C;
+const INV_11 = 1 / 11;
 const KM = 0.008, N0 = -97, F = 1800, LF = Math.log10(F);
+
+// High-performance cached DOM element map (zero querySelector overhead in animation loop)
+const domNodes = {
+  sCov: $('#sCov'),
+  sCovT: $('#sCovT'),
+  mCov: $('#mCov'),
+  sRate: $('#sRate'),
+  sCost: $('#sCost'),
+  sBud: $('#sBud'),
+  sBudLim: $('#sBudLim'),
+  mBud: $('#mBud'),
+  sStar: $('#sStar'),
+  sMsg: $('#sMsg'),
+  hint: $('#hint'),
+  fpsBadge: $('#fpsBadge'),
+  rayHud: $('#rayHud'),
+  rhTitle: $('#rhTitle'),
+  rhStatus: $('#rhStatus'),
+  rhRsrp: $('#rhRsrp'),
+  rhSinr: $('#rhSinr'),
+  rhDist: $('#rhDist'),
+  rhTip: $('#rhTip'),
+  tut: $('#tut'),
+  card: $('#card'),
+  btnOrbit: $('#btnOrbit'),
+  btnTheme: $('#btnTheme'),
+  btnLive: $('#btnLive')
+};
+
+// Dirty Flag Memoization cache to completely eliminate DOM Reflow & Layout Thrashing
+const domCache = {
+  covText: '',
+  covClass: '',
+  covTText: '',
+  covWidth: '',
+  rateText: '',
+  costText: '',
+  costClass: '',
+  budText: '',
+  budLimText: '',
+  budWidth: '',
+  budBg: '',
+  starText: '',
+  starWin: null,
+  msgText: '',
+  hintOpacity: '',
+  fpsText: ''
+};
 
 const LV = [
   { n: '🏡 Село', b: 14, u: 50, bud: 100, sd: 3 },
@@ -1242,6 +1316,43 @@ function makeBuildingTexture(isNight) {
   t.wrapS = THREE.RepeatWrapping;
   t.wrapT = THREE.RepeatWrapping;
   return t;
+}
+
+// High-Contrast Procedural Emissive Map for Skyscraper Windows & Penthouse Bloom
+let cachedBuildingEmissiveTex = null;
+function makeBuildingEmissiveTexture() {
+  if (cachedBuildingEmissiveTex) return cachedBuildingEmissiveTex;
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 512;
+  const x = c.getContext('2d');
+
+  // Black background (concrete walls do not glow)
+  x.fillStyle = '#000000';
+  x.fillRect(0, 0, 256, 512);
+
+  const cols = 6, rows = 12, padX = 12, padY = 12;
+  const ww = (256 - padX * (cols + 1)) / cols;
+  const wh = (512 - padY * (rows + 1)) / rows;
+
+  for (let r = 0; r < rows; r++) {
+    for (let cl = 0; cl < cols; cl++) {
+      const lit = ((r * 7 + cl * 13) % 4) !== 0;
+      if (lit) {
+        const colorPick = (r + cl) % 5;
+        x.fillStyle = colorPick === 0 ? '#ffdf33' : (colorPick === 1 ? '#00f0ff' : '#60a5fa');
+        x.fillRect(padX + cl * (ww + padX), padY + r * (wh + padY), ww, wh);
+      }
+    }
+  }
+
+  // Penthouse neon cyan bloom
+  x.fillStyle = '#90e0ef';
+  x.fillRect(padX, padY, 256 - padX * 2, wh * 0.9);
+
+  cachedBuildingEmissiveTex = new THREE.CanvasTexture(c);
+  cachedBuildingEmissiveTex.wrapS = THREE.RepeatWrapping;
+  cachedBuildingEmissiveTex.wrapT = THREE.RepeatWrapping;
+  return cachedBuildingEmissiveTex;
 }
 
 // Procedural Helipad Texture with "H" symbol and safety perimeter
@@ -1317,6 +1428,346 @@ function getStarSpriteTexture() {
   return cachedStarTex;
 }
 
+// Procedural Wet Night Asphalt PBR Normal & Roughness Maps
+let cachedAsphaltNormalTex = null;
+let cachedAsphaltRoughnessTex = null;
+function getAsphaltTextures() {
+  if (cachedAsphaltNormalTex && cachedAsphaltRoughnessTex) {
+    return { normal: cachedAsphaltNormalTex, roughness: cachedAsphaltRoughnessTex };
+  }
+  const size = 256;
+  const nCanvas = document.createElement('canvas');
+  nCanvas.width = size; nCanvas.height = size;
+  const nCtx = nCanvas.getContext('2d');
+  const nImg = nCtx.createImageData(size, size);
+  const nData = nImg.data;
+
+  const rCanvas = document.createElement('canvas');
+  rCanvas.width = size; rCanvas.height = size;
+  const rCtx = rCanvas.getContext('2d');
+  const rImg = rCtx.createImageData(size, size);
+  const rData = rImg.data;
+
+  // Height map: fine aggregate grit + undulating road puddles
+  const heights = new Float32Array(size * size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const grain = (Math.random() - 0.5) * 0.45;
+      const puddle = Math.sin(x * 0.05) * Math.cos(y * 0.05) * 0.35 + Math.sin((x + y) * 0.03) * 0.2;
+      heights[y * size + x] = grain + puddle;
+    }
+  }
+
+  // Sobel central difference filter for normal vectors & roughness
+  for (let y = 0; y < size; y++) {
+    const ym1 = (y - 1 + size) % size;
+    const yp1 = (y + 1) % size;
+    for (let x = 0; x < size; x++) {
+      const xm1 = (x - 1 + size) % size;
+      const xp1 = (x + 1) % size;
+
+      const idx = (y * size + x) * 4;
+      const hL = heights[y * size + xm1];
+      const hR = heights[y * size + xp1];
+      const hU = heights[ym1 * size + x];
+      const hD = heights[yp1 * size + x];
+
+      const dx = (hR - hL) * 1.8;
+      const dy = (hD - hU) * 1.8;
+      const dz = 1.0;
+      const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+      nData[idx]     = Math.floor((-dx / len * 0.5 + 0.5) * 255);
+      nData[idx + 1] = Math.floor((-dy / len * 0.5 + 0.5) * 255);
+      nData[idx + 2] = Math.floor((dz / len * 0.5 + 0.5) * 255);
+      nData[idx + 3] = 255;
+
+      const h = heights[y * size + x];
+      const rough = Math.max(0.12, Math.min(0.85, 0.38 + h * 0.4));
+      const rByte = Math.floor(rough * 255);
+      rData[idx]     = rByte;
+      rData[idx + 1] = rByte;
+      rData[idx + 2] = rByte;
+      rData[idx + 3] = 255;
+    }
+  }
+
+  nCtx.putImageData(nImg, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+
+  cachedAsphaltNormalTex = new THREE.CanvasTexture(nCanvas);
+  cachedAsphaltNormalTex.wrapS = THREE.RepeatWrapping;
+  cachedAsphaltNormalTex.wrapT = THREE.RepeatWrapping;
+  cachedAsphaltNormalTex.repeat.set(16, 11);
+
+  cachedAsphaltRoughnessTex = new THREE.CanvasTexture(rCanvas);
+  cachedAsphaltRoughnessTex.wrapS = THREE.RepeatWrapping;
+  cachedAsphaltRoughnessTex.wrapT = THREE.RepeatWrapping;
+  cachedAsphaltRoughnessTex.repeat.set(16, 11);
+
+  return { normal: cachedAsphaltNormalTex, roughness: cachedAsphaltRoughnessTex };
+}
+
+// Procedural Road Network Atlas Texture (High-Resolution with Markings, Zebras, Stop Lines)
+let cachedRoadTexNight = null;
+let cachedRoadTexDay = null;
+
+function makeCityRoadsTexture(isNight) {
+  if (isNight && cachedRoadTexNight) return cachedRoadTexNight;
+  if (!isNight && cachedRoadTexDay) return cachedRoadTexDay;
+
+  const c = document.createElement('canvas');
+  c.width = isMobile ? 1024 : 2048;
+  c.height = isMobile ? 683 : 1365;
+  const ctx = c.getContext('2d');
+  const cw = c.width, ch = c.height;
+
+  // Base background: clean architectural pavement
+  ctx.fillStyle = isNight ? '#090d16' : '#d8e1eb';
+  ctx.fillRect(0, 0, cw, ch);
+
+  // Sidewalk concrete tile grid
+  ctx.strokeStyle = isNight ? 'rgba(255, 255, 255, 0.032)' : 'rgba(0, 0, 0, 0.04)';
+  ctx.lineWidth = 1;
+  const tileSize = isMobile ? 14 : 24;
+  ctx.beginPath();
+  for (let x = 0; x < cw; x += tileSize) {
+    ctx.moveTo(x, 0); ctx.lineTo(x, ch);
+  }
+  for (let y = 0; y < ch; y += tileSize) {
+    ctx.moveTo(0, y); ctx.lineTo(cw, y);
+  }
+  ctx.stroke();
+
+  // Coordinate mappers from sim (900x600) to canvas (cw x ch)
+  const fx = x => (x / W) * cw;
+  const fy = y => (y / H) * ch;
+  const scale = cw / 900;
+
+  // Road network arteries
+  const avenues = [
+    { x: 90,  w: 48 * scale, lanes: 4 },
+    { x: 250, w: 44 * scale, lanes: 4 },
+    { x: 450, w: 56 * scale, lanes: 4 }, // Central Grand Avenue
+    { x: 650, w: 44 * scale, lanes: 4 },
+    { x: 810, w: 48 * scale, lanes: 4 }
+  ];
+  const xStreets = [
+    { x: 170, w: 28 * scale, lanes: 2 },
+    { x: 350, w: 28 * scale, lanes: 2 },
+    { x: 550, w: 28 * scale, lanes: 2 },
+    { x: 730, w: 28 * scale, lanes: 2 }
+  ];
+
+  const boulevards = [
+    { y: 80,  w: 44 * scale, lanes: 4 },
+    { y: 190, w: 38 * scale, lanes: 4 },
+    { y: 300, w: 52 * scale, lanes: 4 }, // Central Cross Boulevard
+    { y: 410, w: 38 * scale, lanes: 4 },
+    { y: 520, w: 44 * scale, lanes: 4 }
+  ];
+  const yStreets = [
+    { y: 135, w: 26 * scale, lanes: 2 },
+    { y: 245, w: 26 * scale, lanes: 2 },
+    { y: 355, w: 26 * scale, lanes: 2 },
+    { y: 465, w: 26 * scale, lanes: 2 }
+  ];
+
+  const allXRoads = [...avenues, ...xStreets];
+  const allYRoads = [...boulevards, ...yStreets];
+
+  // Draw asphalt road beds
+  ctx.fillStyle = isNight ? '#05080f' : '#334155';
+  allXRoads.forEach(rd => {
+    ctx.fillRect(fx(rd.x) - rd.w / 2, 0, rd.w, ch);
+  });
+  allYRoads.forEach(rd => {
+    ctx.fillRect(0, fy(rd.y) - rd.w / 2, cw, rd.w);
+  });
+
+  // Road shoulders and curb border lines
+  ctx.strokeStyle = isNight ? 'rgba(56, 189, 248, 0.45)' : 'rgba(255, 255, 255, 0.7)';
+  ctx.lineWidth = Math.max(1, 2 * scale);
+  allXRoads.forEach(rd => {
+    const rx = fx(rd.x);
+    ctx.beginPath();
+    ctx.moveTo(rx - rd.w / 2, 0); ctx.lineTo(rx - rd.w / 2, ch);
+    ctx.moveTo(rx + rd.w / 2, 0); ctx.lineTo(rx + rd.w / 2, ch);
+    ctx.stroke();
+  });
+  allYRoads.forEach(rd => {
+    const ry = fy(rd.y);
+    ctx.beginPath();
+    ctx.moveTo(0, ry - rd.w / 2); ctx.lineTo(cw, ry - rd.w / 2);
+    ctx.moveTo(0, ry + rd.w / 2); ctx.lineTo(cw, ry + rd.w / 2);
+    ctx.stroke();
+  });
+
+  // Road markings: Lane Dividers
+  allXRoads.forEach(rd => {
+    const rx = fx(rd.x);
+    if (rd.lanes === 4) {
+      // Double solid center line
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = Math.max(1, 1.8 * scale);
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(rx - 2.5 * scale, 0); ctx.lineTo(rx - 2.5 * scale, ch);
+      ctx.moveTo(rx + 2.5 * scale, 0); ctx.lineTo(rx + 2.5 * scale, ch);
+      ctx.stroke();
+
+      // Dashed lane separators
+      ctx.strokeStyle = isNight ? 'rgba(255, 255, 255, 0.85)' : '#f8fafc';
+      ctx.lineWidth = Math.max(1, 1.5 * scale);
+      ctx.setLineDash([16 * scale, 12 * scale]);
+      ctx.beginPath();
+      ctx.moveTo(rx - rd.w / 4, 0); ctx.lineTo(rx - rd.w / 4, ch);
+      ctx.moveTo(rx + rd.w / 4, 0); ctx.lineTo(rx + rd.w / 4, ch);
+      ctx.stroke();
+    } else {
+      // 2 lanes: dashed center line
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = Math.max(1, 1.8 * scale);
+      ctx.setLineDash([12 * scale, 10 * scale]);
+      ctx.beginPath();
+      ctx.moveTo(rx, 0); ctx.lineTo(rx, ch);
+      ctx.stroke();
+    }
+  });
+
+  allYRoads.forEach(rd => {
+    const ry = fy(rd.y);
+    if (rd.lanes === 4) {
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = Math.max(1, 1.8 * scale);
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(0, ry - 2.5 * scale); ctx.lineTo(cw, ry - 2.5 * scale);
+      ctx.moveTo(0, ry + 2.5 * scale); ctx.lineTo(cw, ry + 2.5 * scale);
+      ctx.stroke();
+
+      ctx.strokeStyle = isNight ? 'rgba(255, 255, 255, 0.85)' : '#f8fafc';
+      ctx.lineWidth = Math.max(1, 1.5 * scale);
+      ctx.setLineDash([16 * scale, 12 * scale]);
+      ctx.beginPath();
+      ctx.moveTo(0, ry - rd.w / 4); ctx.lineTo(cw, ry - rd.w / 4);
+      ctx.moveTo(0, ry + rd.w / 4); ctx.lineTo(cw, ry + rd.w / 4);
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = Math.max(1, 1.8 * scale);
+      ctx.setLineDash([12 * scale, 10 * scale]);
+      ctx.beginPath();
+      ctx.moveTo(0, ry); ctx.lineTo(cw, ry);
+      ctx.stroke();
+    }
+  });
+  ctx.setLineDash([]);
+
+  // Intersections: Clear junction box, draw Zebra crosswalks and Stop lines
+  function drawCrosswalk(x, y, w, h, dir) {
+    ctx.fillStyle = isNight ? 'rgba(255, 255, 255, 0.94)' : '#ffffff';
+    if (dir === 'horizontal') {
+      const stripes = Math.max(3, Math.floor(w / (6 * scale)));
+      const stripeW = w / (stripes * 2 - 1);
+      for (let i = 0; i < stripes; i++) {
+        ctx.fillRect(x + i * stripeW * 2, y, stripeW, h);
+      }
+    } else {
+      const stripes = Math.max(3, Math.floor(h / (6 * scale)));
+      const stripeH = h / (stripes * 2 - 1);
+      for (let i = 0; i < stripes; i++) {
+        ctx.fillRect(x, y + i * stripeH * 2, w, stripeH);
+      }
+    }
+  }
+
+  function drawStopLine(x, y, len, dir) {
+    ctx.fillStyle = isNight ? 'rgba(255, 255, 255, 0.95)' : '#ffffff';
+    if (dir === 'horizontal') {
+      ctx.fillRect(x, y, len, 4 * scale);
+    } else {
+      ctx.fillRect(x, y, 4 * scale, len);
+    }
+  }
+
+  allXRoads.forEach(xrd => {
+    const rx = fx(xrd.x);
+    allYRoads.forEach(yrd => {
+      const ry = fy(yrd.y);
+
+      // Clean junction box
+      ctx.fillStyle = isNight ? '#05080f' : '#334155';
+      ctx.fillRect(rx - xrd.w / 2, ry - yrd.w / 2, xrd.w, yrd.w);
+
+      const crosswalkDepth = 12 * scale;
+      const stopLineOffset = 20 * scale;
+
+      // North approach
+      drawCrosswalk(rx - xrd.w / 2 + 3 * scale, ry - yrd.w / 2 - crosswalkDepth - 3 * scale, xrd.w - 6 * scale, crosswalkDepth, 'horizontal');
+      drawStopLine(rx - xrd.w / 2 + 2 * scale, ry - yrd.w / 2 - stopLineOffset, xrd.w - 4 * scale, 'horizontal');
+
+      // South approach
+      drawCrosswalk(rx - xrd.w / 2 + 3 * scale, ry + yrd.w / 2 + 3 * scale, xrd.w - 6 * scale, crosswalkDepth, 'horizontal');
+      drawStopLine(rx - xrd.w / 2 + 2 * scale, ry + yrd.w / 2 + stopLineOffset - 4 * scale, xrd.w - 4 * scale, 'horizontal');
+
+      // West approach
+      drawCrosswalk(rx - xrd.w / 2 - crosswalkDepth - 3 * scale, ry - yrd.w / 2 + 3 * scale, crosswalkDepth, yrd.w - 6 * scale, 'vertical');
+      drawStopLine(rx - xrd.w / 2 - stopLineOffset, ry - yrd.w / 2 + 2 * scale, yrd.w - 4 * scale, 'vertical');
+
+      // East approach
+      drawCrosswalk(rx + xrd.w / 2 + 3 * scale, ry - yrd.w / 2 + 3 * scale, crosswalkDepth, yrd.w - 6 * scale, 'vertical');
+      drawStopLine(rx + xrd.w / 2 + stopLineOffset - 4 * scale, ry - yrd.w / 2 + 2 * scale, yrd.w - 4 * scale, 'vertical');
+    });
+  });
+
+  const t = new THREE.CanvasTexture(c);
+  t.anisotropy = 4;
+  if (isNight) cachedRoadTexNight = t;
+  else cachedRoadTexDay = t;
+  return t;
+}
+
+// Procedural Cyberpunk Corporate Rooftop Neon Logo Generator
+const _cyberLogoCache = {};
+function makeCyberLogoTexture(brandName, colorHex) {
+  const cacheKey = `${brandName}_${colorHex}`;
+  if (_cyberLogoCache[cacheKey]) return _cyberLogoCache[cacheKey];
+
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 80;
+  const ctx = c.getContext('2d');
+
+  // Background frame
+  ctx.fillStyle = '#070a14';
+  ctx.fillRect(0, 0, 256, 80);
+
+  // Outer neon border
+  ctx.strokeStyle = colorHex;
+  ctx.lineWidth = 3;
+  ctx.shadowColor = colorHex;
+  ctx.shadowBlur = 8;
+  ctx.strokeRect(6, 6, 244, 68);
+
+  // Decorative corner accents
+  ctx.fillStyle = colorHex;
+  ctx.fillRect(3, 3, 10, 10);
+  ctx.fillRect(243, 3, 10, 10);
+  ctx.fillRect(3, 67, 10, 10);
+  ctx.fillRect(243, 67, 10, 10);
+
+  // Logo text
+  ctx.fillStyle = colorHex;
+  ctx.font = '800 24px "Figtree", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(brandName, 128, 40);
+
+  const t = new THREE.CanvasTexture(c);
+  _cyberLogoCache[cacheKey] = t;
+  return t;
+}
+
 // Deterministic RNG
 function rng(a) {
   return () => {
@@ -1356,9 +1807,10 @@ function buildCityData() {
     if (gx >= 0 && gx < GW && gy >= 0 && gy < GH && occ[gy * GW + gx] === -1) {
       const ang = r() * Math.PI * 2;
       const spd = 7 + r() * 12;
-      U.push({ x, y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, g: null, rate: 0 });
+      U.push({ x, y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, g: { r: -999, q: -999, i: -1 }, rate: 0 });
     }
   }
+  initUserBuffers();
 }
 
 // Radio propagation models: Friis + COST-231 Hata (1800 MHz)
@@ -1429,9 +1881,9 @@ function rx(s, x, y) {
   const dx = x - s.x, dy = y - s.y;
   let w = 0, lastB = -1;
   for (let k = 1; k <= 10; k++) {
-    const t = k / 11;
-    const gx = Math.min(GW - 1, Math.max(0, ((s.x + dx * t) / C) | 0));
-    const gy = Math.min(GH - 1, Math.max(0, ((s.y + dy * t) / C) | 0));
+    const t = k * INV_11;
+    const gx = Math.min(GW - 1, Math.max(0, ((s.x + dx * t) * INV_C) | 0));
+    const gy = Math.min(GH - 1, Math.max(0, ((s.y + dy * t) * INV_C) | 0));
     const b = occ[gy * GW + gx];
     if (b >= 0 && b !== lastB) {
       w++;
@@ -1488,6 +1940,54 @@ function sigFast(x, y) {
   return fastSigResult;
 }
 
+// High-speed Zero-Allocation Subscriber Signal Calculator
+function calcSubscriberSignal(x, y, out) {
+  const len = S.length;
+  if (!len) {
+    out.r = -999;
+    out.q = -999;
+    out.i = -1;
+    return;
+  }
+  let b = -999, bi = -1;
+  for (let i = 0; i < len; i++) {
+    const v = rx(S[i], x, y);
+    stPowers[i] = v;
+    if (v > b) { b = v; bi = i; }
+  }
+  let I = 10 ** (N0 / 10);
+  const targetCh = S[bi].ch;
+  for (let i = 0; i < len; i++) {
+    if (i !== bi && S[i].ch === targetCh) {
+      I += 10 ** (stPowers[i] / 10);
+    }
+  }
+  out.r = b;
+  out.i = bi;
+  out.q = b - 10 * Math.log10(I);
+}
+
+// High-speed Flat Typed Arrays for Subscribers (Zero GC allocations at 144Hz)
+const MAX_U = 300;
+const uPosX = new Float32Array(MAX_U);
+const uPosY = new Float32Array(MAX_U);
+const uVelX = new Float32Array(MAX_U);
+const uVelY = new Float32Array(MAX_U);
+const uGood = new Uint8Array(MAX_U);
+
+function initUserBuffers() {
+  const count = U.length;
+  for (let i = 0; i < count; i++) {
+    const u = U[i];
+    uPosX[i] = u.x;
+    uPosY[i] = u.y;
+    uVelX[i] = u.vx || 0;
+    uVelY[i] = u.vy || 0;
+    if (!u.g) u.g = { r: -999, q: -999, i: -1 };
+    uGood[i] = (u.g.r >= -105 && u.g.q >= 0) ? 1 : 0;
+  }
+}
+
 const stops = [[239, 68, 68], [245, 158, 11], [16, 185, 129], [59, 130, 246]];
 function ramp(t) {
   t = Math.max(0, Math.min(1, t)) * 3;
@@ -1501,21 +2001,77 @@ const cost = s => {
   return 12 + (s.h - 15) * 0.3 + (s.p - 30) * 0.5 + secCost;
 };
 
+// 144Hz Dirty-Flag Memoized updateStats (Eliminates DOM Layout Thrashing & CSS Restyle)
 function updateStats(ok, sum) {
   const L = LV[lv], tot = S.reduce((a, s) => a + cost(s), 0);
   const cov = U.length ? (ok / U.length) * 100 : 0;
   const rate = U.length ? sum / U.length : 0;
-  $('#sCov').textContent = cov.toFixed(0) + '%';
-  $('#sCov').className = cov >= 90 ? 'ok' : '';
-  $('#sCovT').textContent = `${ok} из ${U.length} абон.`;
-  $('#mCov').style.width = cov + '%';
-  $('#sRate').textContent = rate.toFixed(1);
-  $('#sCost').textContent = tot.toFixed(0);
-  $('#sCost').className = tot > L.bud ? 'bad' : '';
-  $('#sBud').textContent = `из ${L.bud} тыс. $`;
-  $('#sBudLim').textContent = `лимит ${L.bud}k $`;
-  $('#mBud').style.width = Math.min(100, (tot / L.bud) * 100) + '%';
-  $('#mBud').style.background = tot > L.bud ? '#ef4444' : '';
+
+  const covText = cov.toFixed(0) + '%';
+  if (domCache.covText !== covText) {
+    domNodes.sCov.textContent = covText;
+    domCache.covText = covText;
+  }
+
+  const covClass = cov >= 90 ? 'ok' : '';
+  if (domCache.covClass !== covClass) {
+    domNodes.sCov.className = covClass;
+    domCache.covClass = covClass;
+  }
+
+  const covTText = `${ok} из ${U.length} абон.`;
+  if (domCache.covTText !== covTText) {
+    domNodes.sCovT.textContent = covTText;
+    domCache.covTText = covTText;
+  }
+
+  const covWidth = cov + '%';
+  if (domCache.covWidth !== covWidth) {
+    domNodes.mCov.style.width = covWidth;
+    domCache.covWidth = covWidth;
+  }
+
+  const rateText = rate.toFixed(1);
+  if (domCache.rateText !== rateText) {
+    domNodes.sRate.textContent = rateText;
+    domCache.rateText = rateText;
+  }
+
+  const costText = tot.toFixed(0);
+  if (domCache.costText !== costText) {
+    domNodes.sCost.textContent = costText;
+    domCache.costText = costText;
+  }
+
+  const costClass = tot > L.bud ? 'bad' : '';
+  if (domCache.costClass !== costClass) {
+    domNodes.sCost.className = costClass;
+    domCache.costClass = costClass;
+  }
+
+  const budText = `из ${L.bud} тыс. $`;
+  if (domCache.budText !== budText) {
+    domNodes.sBud.textContent = budText;
+    domCache.budText = budText;
+  }
+
+  const budLimText = `лимит ${L.bud}k $`;
+  if (domCache.budLimText !== budLimText) {
+    domNodes.sBudLim.textContent = budLimText;
+    domCache.budLimText = budLimText;
+  }
+
+  const budWidth = Math.min(100, (tot / L.bud) * 100) + '%';
+  if (domCache.budWidth !== budWidth) {
+    domNodes.mBud.style.width = budWidth;
+    domCache.budWidth = budWidth;
+  }
+
+  const budBg = tot > L.bud ? '#ef4444' : '';
+  if (domCache.budBg !== budBg) {
+    domNodes.mBud.style.background = budBg;
+    domCache.budBg = budBg;
+  }
 
   let st = 0, m = 'Цель: покрыть ≥ 90% абонентов';
   if (cov >= 90 && tot <= L.bud) {
@@ -1529,11 +2085,29 @@ function updateStats(ok, sum) {
   } else if (cov >= 90 && tot > L.bud) {
     m = '⚠️ Покрытие есть, но превышен бюджет! Удали лишнюю БС или снизь высоту';
   }
-  const starEl = $('#sStar');
-  starEl.textContent = '★'.repeat(st) + '☆'.repeat(3 - st);
-  starEl.classList.toggle('win', st === 3);
-  $('#sMsg').textContent = m;
-  $('#hint').style.opacity = S.length ? '0' : '1';
+
+  const starText = '★'.repeat(st) + '☆'.repeat(3 - st);
+  if (domCache.starText !== starText) {
+    domNodes.sStar.textContent = starText;
+    domCache.starText = starText;
+  }
+
+  const isWin = (st === 3);
+  if (domCache.starWin !== isWin) {
+    domNodes.sStar.classList.toggle('win', isWin);
+    domCache.starWin = isWin;
+  }
+
+  if (domCache.msgText !== m) {
+    domNodes.sMsg.textContent = m;
+    domCache.msgText = m;
+  }
+
+  const hintOpacity = S.length ? '0' : '1';
+  if (domCache.hintOpacity !== hintOpacity) {
+    domNodes.hint.style.opacity = hintOpacity;
+    domCache.hintOpacity = hintOpacity;
+  }
 }
 
 function renderPanel() {
@@ -1638,6 +2212,7 @@ function deleteStation() {
   S.splice(sel, 1);
   sel = null;
   renderPanel();
+  invalidateShadows();
   rd();
 }
 
@@ -1662,25 +2237,58 @@ const easeOutBack = t => {
 };
 
 const gl = $('#gl');
-const R = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-R.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio || 1, 1.5) : Math.min(window.devicePixelRatio || 1, 2));
+const R = new THREE.WebGLRenderer({
+  antialias: true,
+  alpha: true,
+  powerPreference: 'high-performance',
+  precision: 'highp',
+  stencil: false
+});
+R.toneMapping = THREE.ACESFilmicToneMapping;
+R.toneMappingExposure = nightMode ? 1.15 : 1.0;
+R.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio || 1, 1.0) : Math.min(window.devicePixelRatio || 1, 2));
 R.setSize(gl.clientWidth || 900, gl.clientHeight || 500);
 
-// Cinematic soft shadows (PCFSoftShadowMap)
+// Cinematic soft shadows with GPU Static ShadowMap Caching (autoUpdate = false)
 R.shadowMap.enabled = !isMobile;
 R.shadowMap.type = THREE.PCFSoftShadowMap;
+R.shadowMap.autoUpdate = false;
+R.shadowMap.needsUpdate = !isMobile;
 gl.append(R.domElement);
+
+function invalidateShadows() {
+  if (R && R.shadowMap && R.shadowMap.enabled) {
+    R.shadowMap.needsUpdate = true;
+  }
+}
 
 const sc = new THREE.Scene();
 sc.fog = new THREE.FogExp2(nightMode ? 0x090d16 : 0xf4f7fb, 0.0065);
 const camera = new THREE.PerspectiveCamera(40, (gl.clientWidth || 900) / (gl.clientHeight || 500), 1, 450);
 const el = R.domElement;
 
-// Dual-mode realistic lighting (Sun / Moonlight) with 2048x2048 shadow maps
-const ambLight = new THREE.AmbientLight(0x1e293b, 0.55);
+// Cached Canvas Rect for zero-reflow mouse tracking & 144Hz HUD projection (prevents Layout Thrashing)
+const cachedCanvasRect = { left: 0, top: 0, width: gl.clientWidth || 900, height: gl.clientHeight || 500 };
+function updateCanvasRect() {
+  if (el) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) {
+      cachedCanvasRect.left = r.left;
+      cachedCanvasRect.top = r.top;
+      cachedCanvasRect.width = r.width;
+      cachedCanvasRect.height = r.height;
+    }
+  }
+}
+updateCanvasRect();
+window.addEventListener('resize', updateCanvasRect, { passive: true });
+window.addEventListener('scroll', updateCanvasRect, { passive: true });
+
+// Dual-mode realistic lighting (Sun / Moonlight) with 2048x2048 shadow maps & cinematic contrast
+const ambLight = new THREE.AmbientLight(0x131a2e, 0.45);
 sc.add(ambLight);
 
-const dirLight = new THREE.DirectionalLight(0x93c5fd, 0.70);
+const dirLight = new THREE.DirectionalLight(0xa5c9ff, 0.85);
 dirLight.position.set(-35, 68, -28);
 dirLight.castShadow = !isMobile;
 dirLight.shadow.mapSize.width = 2048;
@@ -1695,11 +2303,18 @@ dirLight.shadow.bias = -0.0006;
 dirLight.shadow.normalBias = 0.025;
 sc.add(dirLight);
 
-// Reflective Wet Night Asphalt Ground
+// Realistic Road Network Surface with Procedural Canvas Markings & PBR Normal Maps
+const roadTexNight = makeCityRoadsTexture(true);
+const roadTexDay = makeCityRoadsTexture(false);
+const asphaltTex = getAsphaltTextures();
 const groundMat = new THREE.MeshStandardMaterial({
-  color: 0x070c18,
-  roughness: 0.38,
-  metalness: 0.32
+  map: nightMode ? roadTexNight : roadTexDay,
+  color: 0xffffff,
+  roughness: nightMode ? 0.32 : 0.65,
+  metalness: nightMode ? 0.38 : 0.12,
+  normalMap: asphaltTex.normal,
+  normalScale: new THREE.Vector2(0.35, 0.35),
+  roughnessMap: asphaltTex.roughness
 });
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 60).rotateX(-Math.PI / 2), groundMat);
 ground.receiveShadow = true;
@@ -1709,7 +2324,7 @@ const gridHelper = new THREE.GridHelper(90, 30, 0x334155, 0x1e293b);
 gridHelper.position.y = 0.01;
 gridHelper.scale.z = 60 / 90;
 gridHelper.material.transparent = true;
-gridHelper.material.opacity = 0.35;
+gridHelper.material.opacity = nightMode ? 0.18 : 0.12;
 sc.add(gridHelper);
 
 // Celestial Twinkling Starfield (750 stars with procedural soft sprite)
@@ -1752,32 +2367,85 @@ const starField = new THREE.Points(starGeo, starMat);
 starField.visible = nightMode && !isMobile;
 sc.add(starField);
 
-// Streetlamps & Warm Radial Glow Pools
+// Utility: Fast zero-dependency BufferGeometry merger for InstancedMesh / Draw Call Reduction
+function mergeBufferGeometries(geos) {
+  let totalVerts = 0, totalIndices = 0;
+  for (let i = 0; i < geos.length; i++) {
+    const g = geos[i];
+    totalVerts += g.attributes.position.count;
+    totalIndices += g.index ? g.index.count : g.attributes.position.count;
+  }
+  const pos = new Float32Array(totalVerts * 3);
+  const norm = new Float32Array(totalVerts * 3);
+  const uv = new Float32Array(totalVerts * 2);
+  const indices = totalVerts > 65535 ? new Uint32Array(totalIndices) : new Uint16Array(totalIndices);
+
+  let vOff = 0, iOff = 0;
+  for (let k = 0; k < geos.length; k++) {
+    const g = geos[k];
+    pos.set(g.attributes.position.array, vOff * 3);
+    if (g.attributes.normal) norm.set(g.attributes.normal.array, vOff * 3);
+    if (g.attributes.uv) uv.set(g.attributes.uv.array, vOff * 2);
+
+    if (g.index) {
+      const idxArr = g.index.array;
+      for (let i = 0; i < g.index.count; i++) {
+        indices[iOff + i] = idxArr[i] + vOff;
+      }
+      iOff += g.index.count;
+    } else {
+      const cnt = g.attributes.position.count;
+      for (let i = 0; i < cnt; i++) {
+        indices[iOff + i] = i + vOff;
+      }
+      iOff += cnt;
+    }
+    vOff += g.attributes.position.count;
+  }
+  const merged = new THREE.BufferGeometry();
+  merged.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  merged.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
+  merged.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  merged.setIndex(new THREE.BufferAttribute(indices, 1));
+  return merged;
+}
+
+// Streetlamps & Warm Radial Glow Pools (InstancedMesh: 3 draw calls total)
 const LG = new THREE.Group();
 sc.add(LG);
 
 const streetPointLights = [];
-const lampBulbMeshes = [];
-const lampPoolMeshes = [];
-
 const mLampPole = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.6 });
 const mLampBulb = new THREE.MeshBasicMaterial({ color: 0xfff0b3 });
-const gLampPole = new THREE.CylinderGeometry(0.045, 0.075, 2.1, 8);
-const gLampArm = new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6).rotateZ(Math.PI / 2);
+const mLampPool = new THREE.MeshBasicMaterial({
+  map: getLampGlowTexture(),
+  transparent: true,
+  opacity: nightMode ? 0.45 : 0.0,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false
+});
+
+// Merged single geometry for metal post (pole + arm)
+const gLampPolePart = new THREE.CylinderGeometry(0.045, 0.075, 2.1, 8).translate(0, 1.05, 0);
+const gLampArmPart = new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6).rotateZ(Math.PI / 2).translate(0.22, 2.05, 0);
+const gLampPost = mergeBufferGeometries([gLampPolePart, gLampArmPart]);
 const gLampBulb = new THREE.SphereGeometry(0.09, 8, 8);
 const gLampPool = new THREE.PlaneGeometry(3.8, 3.8).rotateX(-Math.PI / 2);
+
+let lampPostsMesh = null;
+let lampBulbsMesh = null;
+let lampPoolsMesh = null;
+const _lampDummy = new THREE.Object3D();
 
 function buildStreetLamps() {
   LG.clear();
   streetPointLights.forEach(pl => sc.remove(pl));
   streetPointLights.length = 0;
-  lampBulbMeshes.length = 0;
-  lampPoolMeshes.length = 0;
 
   const xCandidates = [-36, -26, -16, -6, 6, 16, 26, 36];
   const zCandidates = [-22, -11, 0, 11, 22];
 
-  let pLightCount = 0;
+  const validLamps = [];
   xCandidates.forEach((lx, ix) => {
     zCandidates.forEach((lz, iz) => {
       const simX = lx * 10 + W / 2;
@@ -1786,47 +2454,55 @@ function buildStreetLamps() {
       const gy = (simY / C) | 0;
 
       if (gx >= 0 && gx < GW && gy >= 0 && gy < GH && occ[gy * GW + gx] === -1) {
-        const lamp = new THREE.Group();
-        lamp.position.set(lx, 0, lz);
-
-        const pole = new THREE.Mesh(gLampPole, mLampPole);
-        pole.position.y = 1.05;
-        pole.castShadow = true;
-        lamp.add(pole);
-
-        const arm = new THREE.Mesh(gLampArm, mLampPole);
-        arm.position.set(0.22, 2.05, 0);
-        lamp.add(arm);
-
-        const bulb = new THREE.Mesh(gLampBulb, mLampBulb);
-        bulb.position.set(0.44, 2.0, 0);
-        lamp.add(bulb);
-        lampBulbMeshes.push(bulb);
-
-        const poolMat = new THREE.MeshBasicMaterial({
-          map: getLampGlowTexture(),
-          transparent: true,
-          opacity: nightMode ? 0.45 : 0.0,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false
-        });
-        const pool = new THREE.Mesh(gLampPool, poolMat);
-        pool.position.set(0.44, 0.02, 0);
-        lamp.add(pool);
-        lampPoolMeshes.push(pool);
-
-        if (pLightCount < 3 && (ix === 3 || ix === 4) && (iz === 1 || iz === 2 || iz === 3)) {
-          const pl = new THREE.PointLight(0xffb74d, nightMode ? 0.8 : 0, 14, 1.8);
-          pl.position.set(lx + 0.44, 2.1, lz);
-          sc.add(pl);
-          streetPointLights.push(pl);
-          pLightCount++;
-        }
-
-        LG.add(lamp);
+        validLamps.push({ lx, lz, ix, iz });
       }
     });
   });
+
+  if (!validLamps.length) return;
+
+  const count = validLamps.length;
+  lampPostsMesh = new THREE.InstancedMesh(gLampPost, mLampPole, count);
+  lampPostsMesh.castShadow = true;
+  lampPostsMesh.receiveShadow = true;
+
+  lampBulbsMesh = new THREE.InstancedMesh(gLampBulb, mLampBulb, count);
+  lampPoolsMesh = new THREE.InstancedMesh(gLampPool, mLampPool, count);
+
+  let pLightCount = 0;
+  validLamps.forEach((lamp, idx) => {
+    // 1. Post (pole + arm merged)
+    _lampDummy.position.set(lamp.lx, 0, lamp.lz);
+    _lampDummy.rotation.set(0, 0, 0);
+    _lampDummy.scale.set(1, 1, 1);
+    _lampDummy.updateMatrix();
+    lampPostsMesh.setMatrixAt(idx, _lampDummy.matrix);
+
+    // 2. Light bulb
+    _lampDummy.position.set(lamp.lx + 0.44, 2.0, lamp.lz);
+    _lampDummy.updateMatrix();
+    lampBulbsMesh.setMatrixAt(idx, _lampDummy.matrix);
+
+    // 3. Ground light pool
+    _lampDummy.position.set(lamp.lx + 0.44, 0.02, lamp.lz);
+    _lampDummy.updateMatrix();
+    lampPoolsMesh.setMatrixAt(idx, _lampDummy.matrix);
+
+    if (pLightCount < 3 && (lamp.ix === 3 || lamp.ix === 4) && (lamp.iz === 1 || lamp.iz === 2 || lamp.iz === 3)) {
+      const pl = new THREE.PointLight(0xffb74d, nightMode ? 0.8 : 0, 14, 1.8);
+      pl.position.set(lamp.lx + 0.44, 2.1, lamp.lz);
+      sc.add(pl);
+      streetPointLights.push(pl);
+      pLightCount++;
+    }
+  });
+
+  lampPostsMesh.instanceMatrix.needsUpdate = true;
+  lampBulbsMesh.instanceMatrix.needsUpdate = true;
+  lampPoolsMesh.instanceMatrix.needsUpdate = true;
+
+  LG.add(lampPostsMesh, lampBulbsMesh, lampPoolsMesh);
+  invalidateShadows();
 }
 
 // Zero-GC Preallocated Buffers
@@ -1847,28 +2523,43 @@ heatM.position.y = 0.04;
 sc.add(heatM);
 
 // Scene Groups
+const RoadG = new THREE.Group(); // 3D Road Curbs & Highway Markings
+const ParkG = new THREE.Group(); // Low-poly Trees & Park Plazas
 const BG = new THREE.Group(); // Buildings
 const UG = new THREE.Group(); // Subscribers
 const SG = new THREE.Group(); // Base Stations & 3D Sector Beams
 const PG = new THREE.Group(); // Animated Data Packets
 const RG = new THREE.Group(); // 3D Ray-Tracing Inspector
-sc.add(BG, UG, SG, PG, RG);
+sc.add(RoadG, ParkG, BG, UG, SG, PG, RG);
 
 // Textures & Shared Materials
 const bTexNight = makeBuildingTexture(true);
 const bTexDay = makeBuildingTexture(false);
-const mBDefault = new THREE.MeshStandardMaterial({ map: bTexNight, roughness: 0.55, metalness: 0.15 });
-const mBHit = new THREE.MeshStandardMaterial({ color: 0xff4444, emissive: 0xdc2626, emissiveIntensity: 0.65, roughness: 0.4 });
-const mRoofNight = new THREE.MeshStandardMaterial({ color: 0x0f172a });
-const mRoofDay = new THREE.MeshStandardMaterial({ color: 0x475569 });
-const mTower = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.6, roughness: 0.3 });
-const mOk = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x16a34a, emissiveIntensity: 0.6 });
-const mBad = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xdc2626, emissiveIntensity: 0.75 });
+const bTexEmissive = makeBuildingEmissiveTexture();
+const mBDefault = new THREE.MeshStandardMaterial({
+  map: bTexNight,
+  emissiveMap: bTexEmissive,
+  emissive: new THREE.Color(0xffffff),
+  emissiveIntensity: nightMode ? 1.45 : 0.0,
+  roughness: 0.38,
+  metalness: 0.24
+});
+const mBHit = new THREE.MeshStandardMaterial({ color: 0xff4444, emissive: 0xdc2626, emissiveIntensity: 0.85, roughness: 0.4 });
+const mRoofNight = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.65, metalness: 0.15 });
+const mRoofDay = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.75, metalness: 0.05 });
+const mTower = new THREE.MeshStandardMaterial({
+  color: 0xcdd9e5,
+  metalness: 0.92,
+  roughness: 0.22
+});
+const mOk = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x16a34a, emissiveIntensity: 1.2 });
+const mBad = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xdc2626, emissiveIntensity: 1.4 });
 
 // Shared Geometries
 const gTower = new THREE.CylinderGeometry(0.1, 0.24, 1, 12);
-const gBeacon = new THREE.SphereGeometry(0.32, 16, 12);
-const gPanel = new THREE.BoxGeometry(0.1, 0.65, 0.75);
+const gPlatform = new THREE.CylinderGeometry(0.48, 0.48, 0.07, 16);
+const gBeacon = new THREE.SphereGeometry(0.24, 16, 12);
+const gPanel = new THREE.BoxGeometry(0.26, 0.74, 0.12);
 const gRing = new THREE.RingGeometry(0.85, 1.0, 48);
 const gSelRing = new THREE.RingGeometry(1.5, 1.85, 48);
 const gUser = new THREE.SphereGeometry(0.32, 14, 12);
@@ -1876,7 +2567,488 @@ const gUserHalo = new THREE.RingGeometry(0.4, 0.62, 24);
 const gBox = new THREE.BoxGeometry(1, 1, 1);
 const gRoof = new THREE.BoxGeometry(0.92, 0.12, 0.92);
 
-// Create 3D Sector Cone Geometry (65 deg beamwidth wedge)
+// 3D Glowing Neon Curbs along Avenues
+const mCurb = new THREE.MeshStandardMaterial({
+  color: nightMode ? 0x06b6d4 : 0x94a3b8,
+  emissive: nightMode ? 0x06b6d4 : 0x000000,
+  emissiveIntensity: nightMode ? 1.6 : 0,
+  roughness: 0.45,
+  metalness: 0.4
+});
+
+function buildRoadCurbs() {
+  RoadG.clear();
+  const avenueWidths = [4.8, 4.4, 5.6, 4.4, 4.8];
+  const avenueXs = [90, 250, 450, 650, 810];
+  const gCurbZ = new THREE.BoxGeometry(0.08, 0.045, 60);
+
+  avenueXs.forEach((ax, idx) => {
+    const worldX = X(ax);
+    const halfW = avenueWidths[idx] / 2;
+
+    const curbLeft = new THREE.Mesh(gCurbZ, mCurb);
+    curbLeft.position.set(worldX - halfW, 0.025, 0);
+    const curbRight = new THREE.Mesh(gCurbZ, mCurb);
+    curbRight.position.set(worldX + halfW, 0.025, 0);
+    RoadG.add(curbLeft, curbRight);
+  });
+
+  const bvdWidths = [4.4, 3.8, 5.2, 3.8, 4.4];
+  const bvdYs = [80, 190, 300, 410, 520];
+  const gCurbX = new THREE.BoxGeometry(90, 0.045, 0.08);
+
+  bvdYs.forEach((by, idx) => {
+    const worldZ = Z(by);
+    const halfW = bvdWidths[idx] / 2;
+
+    const curbTop = new THREE.Mesh(gCurbX, mCurb);
+    curbTop.position.set(0, 0.025, worldZ - halfW);
+    const curbBottom = new THREE.Mesh(gCurbX, mCurb);
+    curbBottom.position.set(0, 0.025, worldZ + halfW);
+    RoadG.add(curbTop, curbBottom);
+  });
+}
+
+// Low-poly Stylized Vegetation & Urban Parks
+const gTreeTrunk = new THREE.CylinderGeometry(0.05, 0.09, 0.65, 6);
+const mTreeTrunk = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85, metalness: 0.1 });
+
+const gTreeDecid1 = new THREE.IcosahedronGeometry(0.38, 1);
+const gTreeDecid2 = new THREE.IcosahedronGeometry(0.28, 1);
+const mTreeDecidA = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.65, flatShading: true });
+const mTreeDecidB = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.65, flatShading: true });
+const mTreeDecidC = new THREE.MeshStandardMaterial({ color: 0x65a30d, roughness: 0.65, flatShading: true });
+
+const gTreePine1 = new THREE.ConeGeometry(0.36, 0.44, 6);
+const gTreePine2 = new THREE.ConeGeometry(0.28, 0.38, 6);
+const gTreePine3 = new THREE.ConeGeometry(0.18, 0.32, 6);
+const mTreePine = new THREE.MeshStandardMaterial({ color: 0x047857, roughness: 0.7, flatShading: true });
+
+const mParkLawn = new THREE.MeshStandardMaterial({
+  color: nightMode ? 0x064e3b : 0x15803d,
+  roughness: 0.75,
+  metalness: 0.1
+});
+
+function createTree(type, colorPick) {
+  const tree = new THREE.Group();
+  const trunk = new THREE.Mesh(gTreeTrunk, mTreeTrunk);
+  trunk.position.y = 0.32;
+  trunk.castShadow = (gfxQuality !== 'eco');
+  trunk.receiveShadow = true;
+  tree.add(trunk);
+
+  if (type === 'pine') {
+    const c1 = new THREE.Mesh(gTreePine1, mTreePine); c1.position.y = 0.58;
+    const c2 = new THREE.Mesh(gTreePine2, mTreePine); c2.position.y = 0.82;
+    const c3 = new THREE.Mesh(gTreePine3, mTreePine); c3.position.y = 1.04;
+    c1.castShadow = (gfxQuality !== 'eco');
+    c2.castShadow = (gfxQuality !== 'eco');
+    c3.castShadow = (gfxQuality !== 'eco');
+    tree.add(c1, c2, c3);
+  } else {
+    const mat = (colorPick % 3 === 0) ? mTreeDecidA : (colorPick % 3 === 1) ? mTreeDecidB : mTreeDecidC;
+    const f1 = new THREE.Mesh(gTreeDecid1, mat); f1.position.y = 0.72;
+    const f2 = new THREE.Mesh(gTreeDecid2, mat); f2.position.set(0.06, 0.98, -0.04);
+    f1.castShadow = (gfxQuality !== 'eco');
+    f2.castShadow = (gfxQuality !== 'eco');
+    tree.add(f1, f2);
+  }
+  return tree;
+}
+
+function buildParkAndTrees() {
+  ParkG.clear();
+  if (gfxQuality === 'eco') return;
+
+  const avenueXs = [90, 250, 450, 650, 810];
+  const zSamples = [-26, -21, -16, -11, -5, 0, 5, 11, 16, 21, 26];
+
+  let treeCount = 0;
+  avenueXs.forEach((ax, aIdx) => {
+    const wx = X(ax);
+    zSamples.forEach((wz, zIdx) => {
+      if (treeCount > 75) return;
+      [-1.9, 1.9].forEach(sideOffset => {
+        const tx = wx + sideOffset;
+        const tz = wz + ((aIdx + zIdx) % 3) * 0.4;
+        const simX = tx * 10 + W / 2;
+        const simY = tz * 10 + H / 2;
+        const gx = (simX / C) | 0;
+        const gy = (simY / C) | 0;
+
+        if (gx >= 0 && gx < GW && gy >= 0 && gy < GH && occ[gy * GW + gx] === -1) {
+          const type = (aIdx + zIdx) % 4 === 0 ? 'pine' : 'decid';
+          const tree = createTree(type, aIdx * 7 + zIdx);
+          tree.position.set(tx, 0, tz);
+          const s = 0.85 + (((aIdx * 11 + zIdx * 17) % 5) / 10);
+          tree.scale.set(s, s, s);
+          ParkG.add(tree);
+          treeCount++;
+        }
+      });
+    });
+  });
+
+  // Dedicated Park Squares in open areas
+  const parkLocations = [
+    { x: -28, z: -15, w: 9, h: 7 },
+    { x: 18, z: 12, w: 10, h: 8 }
+  ];
+  parkLocations.forEach(pl => {
+    const simX = pl.x * 10 + W / 2;
+    const simY = pl.z * 10 + H / 2;
+    const gx = (simX / C) | 0, gy = (simY / C) | 0;
+    if (gx >= 0 && gx < GW && gy >= 0 && gy < GH && occ[gy * GW + gx] === -1) {
+      const lawn = new THREE.Mesh(
+        new THREE.PlaneGeometry(pl.w, pl.h).rotateX(-Math.PI / 2),
+        mParkLawn
+      );
+      lawn.position.set(pl.x, 0.02, pl.z);
+      lawn.receiveShadow = true;
+      ParkG.add(lawn);
+
+      for (let pt = 0; pt < 3; pt++) {
+        const pTree = createTree('decid', pt);
+        const ox = (pt === 0 ? -pl.w * 0.28 : (pt === 1 ? pl.w * 0.25 : 0));
+        const oz = (pt === 0 ? -pl.h * 0.2 : (pt === 1 ? pl.h * 0.25 : 0));
+        pTree.position.set(pl.x + ox, 0, pl.z + oz);
+        ParkG.add(pTree);
+      }
+    }
+  });
+}
+
+// Procedural Openwork Metal Lattice Truss Mast Generator
+function createLatticeTrussGeometry(H) {
+  const positions = [];
+  const indices = [];
+  let vIdx = 0;
+
+  function addBeam(p1, p2, radius) {
+    const dx = p2.x - p1.x, dy = p2.y - p1.y, dz = p2.z - p1.z;
+    const len = Math.hypot(dx, dy, dz);
+    if (len < 0.001) return;
+    const nx = dx / len, ny = dy / len, nz = dz / len;
+
+    let ux = 0, uy = 1, uz = 0;
+    if (Math.abs(ny) > 0.9) { ux = 1; uy = 0; uz = 0; }
+    let rx = ny * uz - nz * uy;
+    let ry = nz * ux - nx * uz;
+    let rz = nx * uy - ny * ux;
+    const rlen = Math.hypot(rx, ry, rz);
+    rx /= rlen; ry /= rlen; rz /= rlen;
+    ux = ry * nz - rz * ny;
+    uy = rz * nx - rx * nz;
+    uz = rx * ny - ry * nx;
+
+    const sides = 4;
+    const baseIdx = vIdx;
+    for (let i = 0; i < sides; i++) {
+      const ang = (i / sides) * Math.PI * 2 + Math.PI / 4;
+      const cos = Math.cos(ang) * radius;
+      const sin = Math.sin(ang) * radius;
+      const ox = rx * cos + ux * sin;
+      const oy = ry * cos + uy * sin;
+      const oz = rz * cos + uz * sin;
+      positions.push(p1.x + ox, p1.y + oy, p1.z + oz);
+      positions.push(p2.x + ox, p2.y + oy, p2.z + oz);
+      vIdx += 2;
+    }
+
+    for (let i = 0; i < sides; i++) {
+      const iNext = (i + 1) % sides;
+      const a0 = baseIdx + i * 2;
+      const a1 = baseIdx + i * 2 + 1;
+      const b0 = baseIdx + iNext * 2;
+      const b1 = baseIdx + iNext * 2 + 1;
+      indices.push(a0, b0, a1);
+      indices.push(b0, b1, a1);
+    }
+  }
+
+  const w0 = 0.65, w1 = 0.28;
+  const nTiers = Math.max(3, Math.round(H * 1.3));
+  for (let k = 0; k < nTiers; k++) {
+    const t0 = k / nTiers;
+    const t1 = (k + 1) / nTiers;
+    const y0 = t0 * H, y1 = t1 * H;
+    const hw0 = (w0 + (w1 - w0) * t0) / 2;
+    const hw1 = (w0 + (w1 - w0) * t1) / 2;
+
+    const b0 = { x: -hw0, y: y0, z: -hw0 };
+    const b1 = { x:  hw0, y: y0, z: -hw0 };
+    const b2 = { x:  hw0, y: y0, z:  hw0 };
+    const b3 = { x: -hw0, y: y0, z:  hw0 };
+
+    const u0 = { x: -hw1, y: y1, z: -hw1 };
+    const u1 = { x:  hw1, y: y1, z: -hw1 };
+    const u2 = { x:  hw1, y: y1, z:  hw1 };
+    const u3 = { x: -hw1, y: y1, z:  hw1 };
+
+    // 4 vertical upright legs
+    addBeam(b0, u0, 0.022);
+    addBeam(b1, u1, 0.022);
+    addBeam(b2, u2, 0.022);
+    addBeam(b3, u3, 0.022);
+
+    // 4 horizontals at top of tier
+    addBeam(u0, u1, 0.015);
+    addBeam(u1, u2, 0.015);
+    addBeam(u2, u3, 0.015);
+    addBeam(u3, u0, 0.015);
+
+    // 8 diagonals (X-bracing on all 4 faces)
+    addBeam(b0, u1, 0.012);
+    addBeam(b1, u0, 0.012);
+    addBeam(b1, u2, 0.012);
+    addBeam(b2, u1, 0.012);
+    addBeam(b2, u3, 0.012);
+    addBeam(b3, u2, 0.012);
+    addBeam(b3, u0, 0.012);
+    addBeam(b0, u3, 0.012);
+  }
+
+  // Vertical ladder on rear face
+  const rungs = Math.floor(H / 0.32);
+  for (let r = 1; r < rungs; r++) {
+    const ly = r * 0.32;
+    const lt = ly / H;
+    const lhw = (w0 + (w1 - w0) * lt) / 2;
+    addBeam({ x: -0.07, y: ly, z: -lhw }, { x: 0.07, y: ly, z: -lhw }, 0.008);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+// Procedural Realistic Cell Mast Builder (Lattice Tower, 3GPP Antennas, RRUs, Grounding Loop)
+function buildLatticeTower(g, s, col, h, mode, tiltRad) {
+  // 1. Lattice Truss Mast
+  const mastGeo = createLatticeTrussGeometry(h);
+  const mastMesh = new THREE.Mesh(mastGeo, mTower);
+  mastMesh.castShadow = (gfxQuality !== 'eco');
+  mastMesh.receiveShadow = true;
+  g.add(mastMesh);
+
+  // 2. Service Platform at top
+  const wTop = 0.28;
+  const platW = wTop * 1.65;
+  const gPlat = new THREE.BoxGeometry(platW, 0.035, platW);
+  const mPlat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.75, roughness: 0.35 });
+  const platMesh = new THREE.Mesh(gPlat, mPlat);
+  platMesh.position.y = h;
+  platMesh.castShadow = (gfxQuality !== 'eco');
+  g.add(platMesh);
+
+  // Handrail around platform
+  const railH = 0.22;
+  const gRailPost = new THREE.CylinderGeometry(0.012, 0.012, railH, 6);
+  const mRail = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8, roughness: 0.25 });
+  [-platW / 2 + 0.02, platW / 2 - 0.02].forEach(rx => {
+    [-platW / 2 + 0.02, platW / 2 - 0.02].forEach(rz => {
+      const post = new THREE.Mesh(gRailPost, mRail);
+      post.position.set(rx, h + railH / 2, rz);
+      g.add(post);
+    });
+  });
+
+  const gRailBarX = new THREE.BoxGeometry(platW, 0.015, 0.015);
+  const gRailBarZ = new THREE.BoxGeometry(0.015, 0.015, platW);
+  const rTop1 = new THREE.Mesh(gRailBarX, mRail); rTop1.position.set(0, h + railH, -platW / 2 + 0.02);
+  const rTop2 = new THREE.Mesh(gRailBarX, mRail); rTop2.position.set(0, h + railH, platW / 2 - 0.02);
+  const rTop3 = new THREE.Mesh(gRailBarZ, mRail); rTop3.position.set(-platW / 2 + 0.02, h + railH, 0);
+  const rTop4 = new THREE.Mesh(gRailBarZ, mRail); rTop4.position.set(platW / 2 - 0.02, h + railH, 0);
+  g.add(rTop1, rTop2, rTop3, rTop4);
+
+  // 3. Central Lightning Rod & Aviation Warning Beacon
+  const gSpire = new THREE.CylinderGeometry(0.012, 0.025, 0.85, 6);
+  const mSpire = new THREE.MeshStandardMaterial({ color: 0xb45309, metalness: 0.9, roughness: 0.2 });
+  const spireMesh = new THREE.Mesh(gSpire, mSpire);
+  spireMesh.position.y = h + 0.45;
+  g.add(spireMesh);
+
+  // Red Aviation Obstruction Warning Beacon
+  const avBeacon = new THREE.Mesh(
+    new THREE.SphereGeometry(0.12, 10, 8),
+    new THREE.MeshBasicMaterial({ color: 0xff2222, transparent: true, opacity: 0.95 })
+  );
+  avBeacon.position.y = h + 0.88;
+  g.add(avBeacon);
+
+  // Frequency Channel Glowing Beacon
+  const bc = new THREE.Mesh(gBeacon, new THREE.MeshBasicMaterial({ color: col }));
+  bc.position.y = h + 0.18;
+  bc.scale.set(0.65, 0.65, 0.65);
+  g.add(bc);
+
+  // 4. Remote Radio Units (RRU) & Copper Grounding Conductor
+  const rruLeds = [];
+  const gRRU = new THREE.BoxGeometry(0.22, 0.34, 0.14);
+  const mRRU = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.45, metalness: 0.7 });
+  const gFins = new THREE.BoxGeometry(0.22, 0.34, 0.035);
+  const mFins = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.8 });
+  const gLed = new THREE.SphereGeometry(0.025, 6, 6);
+
+  const rruCount = mode === '6sec' ? 3 : (mode === '3sec' ? 2 : 1);
+  for (let r = 0; r < rruCount; r++) {
+    const rruGrp = new THREE.Group();
+    const rruMesh = new THREE.Mesh(gRRU, mRRU);
+    const finsMesh = new THREE.Mesh(gFins, mFins);
+    finsMesh.position.z = -0.085;
+    rruMesh.castShadow = (gfxQuality !== 'eco');
+    rruGrp.add(rruMesh, finsMesh);
+
+    // Green RUN/SYS status LED
+    const mLedSys = new THREE.MeshBasicMaterial({ color: 0x22c55e });
+    const ledSys = new THREE.Mesh(gLed, mLedSys);
+    ledSys.position.set(-0.06, 0.11, 0.075);
+    ledSys.userData = { type: 'sys' };
+    rruGrp.add(ledSys);
+    rruLeds.push(ledSys);
+
+    // Cyan ACT/DATA activity LED
+    const mLedAct = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+    const ledAct = new THREE.Mesh(gLed, mLedAct);
+    ledAct.position.set(0.06, 0.11, 0.075);
+    ledAct.userData = { type: 'act' };
+    rruGrp.add(ledAct);
+    rruLeds.push(ledAct);
+
+    const rAng = (r / rruCount) * Math.PI * 2;
+    const rDist = wTop * 0.42;
+    rruGrp.position.set(Math.cos(rAng) * rDist, h - 0.28, Math.sin(rAng) * rDist);
+    rruGrp.rotation.y = -rAng + Math.PI / 2;
+    g.add(rruGrp);
+  }
+
+  // Copper Grounding Loop Line
+  const gGroundWire = new THREE.CylinderGeometry(0.008, 0.008, h, 4);
+  const mGroundWire = new THREE.MeshStandardMaterial({ color: 0xb45309, metalness: 0.95, roughness: 0.2 });
+  const groundWire = new THREE.Mesh(gGroundWire, mGroundWire);
+  groundWire.position.set(-wTop / 2 - 0.03, h / 2, -wTop / 2 - 0.03);
+  g.add(groundWire);
+
+  // 5. Pipe Mounts & 3GPP Directional Panel Antennas
+  const beamRadius = 6 + (s.p - 30) * 0.55;
+  const sectors = mode === '6sec' ? 6 : (mode === '3sec' ? 3 : 0);
+
+  const gPipe = new THREE.CylinderGeometry(0.022, 0.022, 0.85, 8);
+  const mPipe = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.85, roughness: 0.25 });
+  const gAntRadome = new THREE.BoxGeometry(0.12, 0.74, 0.26);
+  const gAntStripe = new THREE.BoxGeometry(0.125, 0.12, 0.265);
+  const gAntBracket = new THREE.BoxGeometry(0.08, 0.15, 0.08);
+
+  const mRadome = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.28, metalness: 0.08 });
+  const mStripe = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.55 });
+  const mBracket = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.3 });
+
+  if (sectors > 0) {
+    const angleStep = (360 / sectors);
+    for (let k = 0; k < sectors; k++) {
+      const a = (s.az + k * angleStep) * Math.PI / 180;
+      const mountR = platW * 0.52;
+      const mx = Math.cos(a) * mountR;
+      const mz = Math.sin(a) * mountR;
+
+      // Pipe mount
+      const pipe = new THREE.Mesh(gPipe, mPipe);
+      pipe.position.set(mx, h + 0.35, mz);
+      pipe.castShadow = (gfxQuality !== 'eco');
+      g.add(pipe);
+
+      // Antenna assembly group
+      const antGrp = new THREE.Group();
+      const radome = new THREE.Mesh(gAntRadome, mRadome);
+      const stripe = new THREE.Mesh(gAntStripe, mStripe);
+      const bracket1 = new THREE.Mesh(gAntBracket, mBracket);
+      bracket1.position.set(-0.08, 0.2, 0);
+      const bracket2 = new THREE.Mesh(gAntBracket, mBracket);
+      bracket2.position.set(-0.08, -0.2, 0);
+
+      radome.castShadow = (gfxQuality !== 'eco');
+      antGrp.add(radome, stripe, bracket1, bracket2);
+
+      const antDist = mountR + 0.12;
+      antGrp.position.set(Math.cos(a) * antDist, h + 0.35, Math.sin(a) * antDist);
+      antGrp.rotation.y = -a;
+      antGrp.rotation.x = tiltRad; // Mechanical downtilt
+      g.add(antGrp);
+
+      // Volumetric beam cone wedge
+      const wedgeGeo = (mode === '6sec') ? gSectorBeam6 : gSectorBeam;
+      const wedge = new THREE.Mesh(
+        wedgeGeo,
+        new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: nightMode ? 0.16 : 0.12, side: THREE.DoubleSide, depthWrite: false })
+      );
+      wedge.scale.setScalar(beamRadius);
+      wedge.rotation.y = -a;
+      wedge.rotation.x = tiltRad;
+      wedge.position.y = 0.08;
+      g.add(wedge);
+    }
+  } else {
+    // Omni collinear antenna rod
+    const gOmniRod = new THREE.CylinderGeometry(0.03, 0.03, 1.1, 8);
+    const mOmniRod = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.25, metalness: 0.1 });
+    const omniRod = new THREE.Mesh(gOmniRod, mOmniRod);
+    omniRod.position.set(0, h + 0.58, 0);
+    g.add(omniRod);
+
+    const omni = new THREE.Mesh(
+      new THREE.CircleGeometry(beamRadius * 0.75, 36).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.11, depthWrite: false })
+    );
+    omni.position.y = 0.08;
+    g.add(omni);
+  }
+
+  // 6. Expanding Animated Wave Rings
+  const rings = [0, 1].map(() => {
+    const r = new THREE.Mesh(gRing, new THREE.MeshBasicMaterial({ color: col, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+    r.rotation.x = -Math.PI / 2;
+    r.position.y = 0.07;
+    g.add(r);
+    return r;
+  });
+
+  return { rings, avBeacon, rruLeds };
+}
+
+// Instanced Subscriber (UG) Materials and Shared State
+const mUserSphere = new THREE.MeshStandardMaterial({ roughness: 0.35, metalness: 0.2 });
+const mUserHalo = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, opacity: 0.5, depthWrite: false });
+const colGood = new THREE.Color(0x22c55e);
+const colBad = new THREE.Color(0xef4444);
+let ugSpheres = null;
+let ugHalos = null;
+const _ugDummy = new THREE.Object3D();
+
+function updateSubscriberColors() {
+  if (!ugSpheres || !ugHalos || !U.length) return;
+  let colorChanged = false;
+  const count = U.length;
+  for (let i = 0; i < count; i++) {
+    const u = U[i];
+    const isGood = (u.g && u.g.r >= -105 && u.g.q >= 0) ? 1 : 0;
+    if (uGood[i] !== isGood) {
+      uGood[i] = isGood;
+      const c = isGood ? colGood : colBad;
+      ugSpheres.setColorAt(i, c);
+      ugHalos.setColorAt(i, c);
+      colorChanged = true;
+    }
+  }
+  if (colorChanged) {
+    if (ugSpheres.instanceColor) ugSpheres.instanceColor.needsUpdate = true;
+    if (ugHalos.instanceColor) ugHalos.instanceColor.needsUpdate = true;
+  }
+}
+
+// 2D Ground Sector Footprint Geometries
 function createSectorWedgeGeo(radius, angleDeg) {
   const geo = new THREE.CircleGeometry(radius, 28, - (angleDeg * Math.PI / 180) / 2, angleDeg * Math.PI / 180);
   geo.rotateX(-Math.PI / 2);
@@ -1885,27 +3057,378 @@ function createSectorWedgeGeo(radius, angleDeg) {
 const gSectorBeam = createSectorWedgeGeo(1, 76);
 const gSectorBeam6 = createSectorWedgeGeo(1, 42);
 
-// Ghost Preview Tower on Hover
+// ================= 1. VOLUMETRIC SECTOR BEAM GEOMETRIES & SHADERS =================
+function createVolumetricSectorGeo(hAngleDeg, vAngleDeg, length, segH, segV) {
+  const hRad = (hAngleDeg * Math.PI / 180) / 2;
+  const vRad = (vAngleDeg * Math.PI / 180) / 2;
+  const positions = [];
+  const dists = [];
+  const sides = [];
+  const indices = [];
+
+  function addQuad(p0, p1, p2, p3, d0, d1, d2, d3, s0, s1, s2, s3) {
+    const base = positions.length / 3;
+    positions.push(...p0, ...p1, ...p2, ...p3);
+    dists.push(d0, d1, d2, d3);
+    sides.push(s0, s1, s2, s3);
+    indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+
+  function getPt(r, th, ph) {
+    return [
+      r * Math.sin(th) * Math.cos(ph),
+      r * Math.sin(ph),
+      r * Math.cos(th) * Math.cos(ph)
+    ];
+  }
+
+  const rSteps = 8;
+  for (let ir = 0; ir < rSteps; ir++) {
+    const rA = (ir / rSteps) * length;
+    const rB = ((ir + 1) / rSteps) * length;
+    const dA = ir / rSteps;
+    const dB = (ir + 1) / rSteps;
+    for (let ih = 0; ih < segH; ih++) {
+      const thA = -hRad + (ih / segH) * 2 * hRad;
+      const thB = -hRad + ((ih + 1) / segH) * 2 * hRad;
+      const sA = -1.0 + (ih / segH) * 2.0;
+      const sB = -1.0 + ((ih + 1) / segH) * 2.0;
+
+      // Top shell (+vRad)
+      addQuad(
+        getPt(rA, thA, vRad), getPt(rB, thA, vRad), getPt(rB, thB, vRad), getPt(rA, thB, vRad),
+        dA, dB, dB, dA, sA, sA, sB, sB
+      );
+      // Bottom shell (-vRad)
+      addQuad(
+        getPt(rA, thA, -vRad), getPt(rA, thB, -vRad), getPt(rB, thB, -vRad), getPt(rB, thA, -vRad),
+        dA, dA, dB, dB, sA, sB, sB, sA
+      );
+      // Central mid-plane fan (ph = 0)
+      addQuad(
+        getPt(rA, thA, 0), getPt(rB, thA, 0), getPt(rB, thB, 0), getPt(rA, thB, 0),
+        dA, dB, dB, dA, sA, sA, sB, sB
+      );
+    }
+  }
+
+  // Lateral boundaries
+  for (let ir = 0; ir < rSteps; ir++) {
+    const rA = (ir / rSteps) * length;
+    const rB = ((ir + 1) / rSteps) * length;
+    const dA = ir / rSteps;
+    const dB = (ir + 1) / rSteps;
+    for (let iv = 0; iv < segV; iv++) {
+      const phA = -vRad + (iv / segV) * 2 * vRad;
+      const phB = -vRad + ((iv + 1) / segV) * 2 * vRad;
+      // Left wall
+      addQuad(
+        getPt(rA, -hRad, phA), getPt(rB, -hRad, phA), getPt(rB, -hRad, phB), getPt(rA, -hRad, phB),
+        dA, dB, dB, dA, 1, 1, 1, 1
+      );
+      // Right wall
+      addQuad(
+        getPt(rA, hRad, phA), getPt(rA, hRad, phB), getPt(rB, hRad, phB), getPt(rB, hRad, phA),
+        dA, dA, dB, dB, 1, 1, 1, 1
+      );
+    }
+  }
+
+  // Outer cap (r = length)
+  for (let ih = 0; ih < segH; ih++) {
+    const thA = -hRad + (ih / segH) * 2 * hRad;
+    const thB = -hRad + ((ih + 1) / segH) * 2 * hRad;
+    const sA = -1.0 + (ih / segH) * 2.0;
+    const sB = -1.0 + ((ih + 1) / segH) * 2.0;
+    for (let iv = 0; iv < segV; iv++) {
+      const phA = -vRad + (iv / segV) * 2 * vRad;
+      const phB = -vRad + ((iv + 1) / segV) * 2 * vRad;
+      addQuad(
+        getPt(length, thA, phA), getPt(length, thB, phA), getPt(length, thB, phB), getPt(length, thA, phB),
+        1, 1, 1, 1, sA, sB, sB, sA
+      );
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('aDist', new THREE.Float32BufferAttribute(dists, 1));
+  geo.setAttribute('aSide', new THREE.Float32BufferAttribute(sides, 1));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function createVolumetricOmniGeo(vAngleDeg, length, segH, segV) {
+  const vRad = (vAngleDeg * Math.PI / 180) / 2;
+  const positions = [];
+  const dists = [];
+  const sides = [];
+  const indices = [];
+
+  function addQuad(p0, p1, p2, p3, d0, d1, d2, d3, s0, s1, s2, s3) {
+    const base = positions.length / 3;
+    positions.push(...p0, ...p1, ...p2, ...p3);
+    dists.push(d0, d1, d2, d3);
+    sides.push(s0, s1, s2, s3);
+    indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+
+  function getPt(r, th, ph) {
+    return [
+      r * Math.sin(th) * Math.cos(ph),
+      r * Math.sin(ph),
+      r * Math.cos(th) * Math.cos(ph)
+    ];
+  }
+
+  const rSteps = 6;
+  for (let ir = 0; ir < rSteps; ir++) {
+    const rA = (ir / rSteps) * length;
+    const rB = ((ir + 1) / rSteps) * length;
+    const dA = ir / rSteps;
+    const dB = (ir + 1) / rSteps;
+    for (let ih = 0; ih < segH; ih++) {
+      const thA = (ih / segH) * 2 * Math.PI;
+      const thB = ((ih + 1) / segH) * 2 * Math.PI;
+
+      // Upper umbrella cone (+vRad)
+      addQuad(
+        getPt(rA, thA, vRad), getPt(rB, thA, vRad), getPt(rB, thB, vRad), getPt(rA, thB, vRad),
+        dA, dB, dB, dA, 0, 0, 0, 0
+      );
+      // Lower umbrella cone (-vRad)
+      addQuad(
+        getPt(rA, thA, -vRad), getPt(rA, thB, -vRad), getPt(rB, thB, -vRad), getPt(rB, thA, -vRad),
+        dA, dA, dB, dB, 0, 0, 0, 0
+      );
+      // Mid disc (ph = 0)
+      addQuad(
+        getPt(rA, thA, 0), getPt(rB, thA, 0), getPt(rB, thB, 0), getPt(rA, thB, 0),
+        dA, dB, dB, dA, 0, 0, 0, 0
+      );
+    }
+  }
+
+  // Outer cap rim
+  for (let ih = 0; ih < segH; ih++) {
+    const thA = (ih / segH) * 2 * Math.PI;
+    const thB = ((ih + 1) / segH) * 2 * Math.PI;
+    for (let iv = 0; iv < segV; iv++) {
+      const phA = -vRad + (iv / segV) * 2 * vRad;
+      const phB = -vRad + ((iv + 1) / segV) * 2 * vRad;
+      addQuad(
+        getPt(length, thA, phA), getPt(length, thB, phA), getPt(length, thB, phB), getPt(length, thA, phB),
+        1, 1, 1, 1, 0, 0, 0, 0
+      );
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('aDist', new THREE.Float32BufferAttribute(dists, 1));
+  geo.setAttribute('aSide', new THREE.Float32BufferAttribute(sides, 1));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+const gVolSector3 = createVolumetricSectorGeo(76, 26, 1, 8, 3);
+const gVolSector6 = createVolumetricSectorGeo(42, 22, 1, 6, 2);
+const gVolOmni = createVolumetricOmniGeo(24, 1, 16, 3);
+
+const volBeamMaterials = CH.map(hex => new THREE.ShaderMaterial({
+  uniforms: {
+    uColor: { value: new THREE.Color(hex) },
+    uOpacity: { value: nightMode ? 0.38 : 0.26 },
+    uTime: { value: 0.0 }
+  },
+  vertexShader: `
+    attribute float aDist;
+    attribute float aSide;
+    varying float vDist;
+    varying float vSide;
+    varying vec3 vWorldNormal;
+    varying vec3 vViewDir;
+
+    void main() {
+      vDist = aDist;
+      vSide = aSide;
+      vec4 worldPos = modelMatrix * vec4(position, 1.0);
+      vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+      vViewDir = normalize(cameraPosition - worldPos.xyz);
+      gl_Position = projectionMatrix * viewMatrix * worldPos;
+    }
+  `,
+  fragmentShader: `
+    uniform vec3 uColor;
+    uniform float uOpacity;
+    uniform float uTime;
+    varying float vDist;
+    varying float vSide;
+    varying vec3 vWorldNormal;
+    varying vec3 vViewDir;
+
+    void main() {
+      // Longitudinal gradient: intense at antenna panel, smoothly fading to perimeter
+      float longitudinal = pow(1.0 - clamp(vDist, 0.0, 1.0), 1.25);
+
+      // Saturated focal core glow at the mast transmitter
+      float apexCore = smoothstep(0.18, 0.0, vDist) * 2.2;
+
+      // Lateral edge falloff for ethereal feathering
+      float lateral = 1.0 - smoothstep(0.45, 1.0, abs(vSide));
+
+      // Fresnel rim glow for 3D depth perception
+      float fresnel = 1.0 - abs(dot(vWorldNormal, vViewDir));
+      float rim = pow(clamp(fresnel, 0.0, 1.0), 1.8) * 0.42;
+
+      // Travelling harmonic radio waves (electromagnetic phase pulse)
+      float wave = sin(vDist * 20.0 - uTime * 4.5) * 0.16 + 0.84;
+
+      float intensity = (longitudinal * 0.85 + apexCore + rim) * lateral * wave;
+      float alpha = clamp(intensity * uOpacity, 0.0, 1.0);
+
+      // Color synthesis: white-hot in core, saturated channel hue along flanks
+      vec3 finalColor = mix(uColor, vec3(1.0, 1.0, 1.0), apexCore * 0.5 + 0.08);
+
+      gl_FragColor = vec4(finalColor, alpha);
+    }
+  `,
+  transparent: true,
+  depthWrite: false,
+  side: THREE.DoubleSide,
+  blending: THREE.AdditiveBlending
+}));
+
+// ================= 2. LASER DATA PACKET BEAMS & STREAKS =================
+function createLaserStreakGeo() {
+  const positions = [];
+  const alphas = [];
+  const whites = [];
+  const indices = [];
+
+  const rings = [
+    { z:  0.25, r: 0.00, a: 1.0, w: 1.0 }, // Nose apex
+    { z:  0.08, r: 0.15, a: 0.95, w: 0.8 }, // Front head
+    { z: -0.35, r: 0.12, a: 0.70, w: 0.3 }, // Mid body
+    { z: -0.95, r: 0.06, a: 0.35, w: 0.0 }, // Tail taper
+    { z: -1.50, r: 0.00, a: 0.00, w: 0.0 }  // Tail tip
+  ];
+
+  const segs = 8;
+  for (let ir = 0; ir < rings.length - 1; ir++) {
+    const r0 = rings[ir], r1 = rings[ir + 1];
+    const base0 = positions.length / 3;
+    for (let s = 0; s < segs; s++) {
+      const ang = (s / segs) * 2 * Math.PI;
+      positions.push(Math.cos(ang) * r0.r, Math.sin(ang) * r0.r, r0.z);
+      alphas.push(r0.a);
+      whites.push(r0.w);
+    }
+    const base1 = positions.length / 3;
+    for (let s = 0; s < segs; s++) {
+      const ang = (s / segs) * 2 * Math.PI;
+      positions.push(Math.cos(ang) * r1.r, Math.sin(ang) * r1.r, r1.z);
+      alphas.push(r1.a);
+      whites.push(r1.w);
+    }
+    for (let s = 0; s < segs; s++) {
+      const n = (s + 1) % segs;
+      indices.push(base0 + s, base1 + s, base1 + n);
+      indices.push(base0 + s, base1 + n, base0 + n);
+    }
+  }
+
+  // Cross-fin core ribbons (horizontal and vertical)
+  const finWidth = 0.22;
+  const ribbonZ = [0.25, 0.08, -0.4, -1.0, -1.5];
+  const ribbonW = [0.0, finWidth, finWidth * 0.75, finWidth * 0.35, 0.0];
+  const ribbonA = [1.0, 0.9, 0.6, 0.25, 0.0];
+  const ribbonWhite = [1.0, 0.9, 0.2, 0.0, 0.0];
+
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < ribbonZ.length - 1; i++) {
+      const z0 = ribbonZ[i], z1 = ribbonZ[i + 1];
+      const w0 = ribbonW[i], w1 = ribbonW[i + 1];
+      const a0 = ribbonA[i], a1 = ribbonA[i + 1];
+      const wh0 = ribbonWhite[i], wh1 = ribbonWhite[i + 1];
+      const base = positions.length / 3;
+
+      if (pass === 0) {
+        positions.push(-w0, 0, z0,  w0, 0, z0,  w1, 0, z1, -w1, 0, z1);
+      } else {
+        positions.push(0, -w0, z0,  0, w0, z0,  0, w1, z1,  0, -w1, z1);
+      }
+      alphas.push(a0, a0, a1, a1);
+      whites.push(wh0, wh0, wh1, wh1);
+      indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('aAlpha', new THREE.Float32BufferAttribute(alphas, 1));
+  geo.setAttribute('aWhite', new THREE.Float32BufferAttribute(whites, 1));
+  geo.setIndex(indices);
+  return geo;
+}
+
+const gLaserStreak = createLaserStreakGeo();
+const laserMaterials = CH.map(hex => new THREE.ShaderMaterial({
+  uniforms: {
+    uColor: { value: new THREE.Color(hex) }
+  },
+  vertexShader: `
+    attribute float aAlpha;
+    attribute float aWhite;
+    varying float vAlpha;
+    varying float vWhite;
+    void main() {
+      vAlpha = aAlpha;
+      vWhite = aWhite;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform vec3 uColor;
+    varying float vAlpha;
+    varying float vWhite;
+    void main() {
+      vec3 col = mix(uColor, vec3(1.0, 1.0, 1.0), vWhite);
+      gl_FragColor = vec4(col, clamp(vAlpha, 0.0, 1.0));
+    }
+  `,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  side: THREE.DoubleSide
+}));
+
+// Pre-allocated vector helpers for zero-GC heading calculations
+const _vForward = new THREE.Vector3(0, 0, 1);
+const _vDir = new THREE.Vector3();
+
+// Ghost Preview Tower on Hover (Holographic Lattice Mast)
 const ghostGroup = new THREE.Group();
 const ghostMat = new THREE.MeshBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.45, depthWrite: false });
-const ghostTw = new THREE.Mesh(gTower, ghostMat);
-ghostTw.scale.y = 3.8; ghostTw.position.y = 1.9;
+const ghostTw = new THREE.Mesh(createLatticeTrussGeometry(3.8), ghostMat);
 const ghostRg = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.35, 36).rotateX(-Math.PI / 2), ghostMat);
 ghostRg.position.y = 0.08;
 ghostGroup.add(ghostTw, ghostRg);
 ghostGroup.visible = false;
 sc.add(ghostGroup);
 
-// 3D Ray-Tracing Inspector Lines (Serving Ray + Interference Ray)
+// 3D Ray-Tracing Inspector Lines (Serving Ray + Interference Ray) with Laser Bloom
 const serveLineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
-const serveLineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 2 });
+const serveLineMat = new THREE.LineBasicMaterial({ color: new THREE.Color(0.8, 2.4, 3.8), linewidth: 2 });
 const serveLine = new THREE.Line(serveLineGeo, serveLineMat);
 serveLine.frustumCulled = false;
 serveLine.visible = false;
 RG.add(serveLine);
 
 const interfLineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
-const interfLineMat = new THREE.LineBasicMaterial({ color: 0xef4444, linewidth: 2 });
+const interfLineMat = new THREE.LineBasicMaterial({ color: new THREE.Color(3.6, 0.4, 0.4), linewidth: 2 });
 const interfLine = new THREE.Line(interfLineGeo, interfLineMat);
 interfLine.frustumCulled = false;
 interfLine.visible = false;
@@ -1919,15 +3442,182 @@ targetMarker.position.y = 0.12;
 targetMarker.visible = false;
 RG.add(targetMarker);
 
-// Animated Data Packets Pool
+// Animated Laser Data Packets Pool
 const PACKET_COUNT = 36;
 const packets = [];
-const gPkt = new THREE.SphereGeometry(0.16, 8, 8);
 for (let i = 0; i < PACKET_COUNT; i++) {
-  const m = new THREE.Mesh(gPkt, new THREE.MeshBasicMaterial({ color: 0x60a5fa }));
+  const m = new THREE.Mesh(gLaserStreak, laserMaterials[0]);
   m.visible = false;
   PG.add(m);
   packets.push({ mesh: m, t: Math.random(), uIdx: i });
+}
+
+// ================= 3. SUBSCRIBER RECEPTION PULSE PING SYSTEM =================
+const PING_COUNT = 24;
+const pingPool = [];
+const pingGeo = new THREE.RingGeometry(0.35, 0.55, 32).rotateX(-Math.PI / 2);
+const pingGroup = new THREE.Group();
+sc.add(pingGroup);
+
+for (let i = 0; i < PING_COUNT; i++) {
+  const m = new THREE.Mesh(
+    pingGeo,
+    new THREE.MeshBasicMaterial({
+      color: 0x3b82f6,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    })
+  );
+  m.visible = false;
+  pingGroup.add(m);
+  pingPool.push({
+    mesh: m,
+    active: false,
+    life: 0,
+    maxLife: 0.55,
+    x: 0, y: 0.12, z: 0
+  });
+}
+
+function triggerPulsePing(x, y, z, colorHex) {
+  if (gfxQuality === 'eco') return;
+  const ping = pingPool.find(p => !p.active) || pingPool[0];
+  ping.active = true;
+  ping.life = 0;
+  ping.x = x; ping.y = y; ping.z = z;
+  ping.mesh.material.color.set(colorHex);
+  ping.mesh.position.set(x, 0.12, z);
+  ping.mesh.scale.set(0.4, 0.4, 0.4);
+  ping.mesh.material.opacity = nightMode ? 0.85 : 0.65;
+  ping.mesh.visible = true;
+}
+
+// ================= 4. PRE-ALLOCATED ZERO-GC INTERFERENCE ARCS =================
+const MAX_INTERF_ARCS = 28;
+const SEGS_PER_ARC = 5;
+const VERTS_PER_ARC = SEGS_PER_ARC * 2; // 10 vertices
+const interfPosArr = new Float32Array(MAX_INTERF_ARCS * VERTS_PER_ARC * 3);
+const interfColArr = new Float32Array(MAX_INTERF_ARCS * VERTS_PER_ARC * 3);
+const interfArcGeo = new THREE.BufferGeometry();
+interfArcGeo.setAttribute('position', new THREE.BufferAttribute(interfPosArr, 3));
+interfArcGeo.setAttribute('color', new THREE.BufferAttribute(interfColArr, 3));
+const interfArcMat = new THREE.LineBasicMaterial({
+  vertexColors: true,
+  transparent: true,
+  opacity: 0.95,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false
+});
+const interfArcMesh = new THREE.LineSegments(interfArcGeo, interfArcMat);
+interfArcMesh.frustumCulled = false;
+sc.add(interfArcMesh);
+
+function updateInterferenceVFX(now) {
+  if (gfxQuality === 'eco' || !S.length || !U.length) {
+    interfArcMesh.visible = false;
+    return;
+  }
+
+  let vertPtr = 0;
+  const pos = interfPosArr;
+  const col = interfColArr;
+
+  let arcsDrawn = 0;
+  for (let i = 0; i < U.length && arcsDrawn < MAX_INTERF_ARCS - 2; i++) {
+    const u = U[i];
+    if (!u || !u.g || u.g.interfIdx < 0 || u.g.q >= 3.5 || u.g.r < -112) continue;
+
+    const ist = S[u.g.interfIdx];
+    if (!ist) continue;
+
+    const ux = X(u.x), uy = 0.42, uz = Z(u.y);
+    const ix = X(ist.x), iy = ist.h / 7.5 + 0.3, iz = Z(ist.y);
+
+    const dx = ix - ux, dy = iy - uy, dz = iz - uz;
+    const dist = Math.hypot(dx, dy, dz);
+    if (dist < 0.001) continue;
+
+    const nx = dx / dist, ny = dy / dist, nz = dz / dist;
+    // Perpendicular plane vectors for electric jitter
+    const px = -nz, py = 0, pz = nx;
+    const qx = 0, qy = 1, qz = 0;
+
+    const arcLen = Math.min(6.5, dist * 0.45);
+    const seed = i * 13.7;
+
+    // Arc 1: Jagged electric discharge shooting from user towards interfering signal
+    let lastX = ux, lastY = uy, lastZ = uz;
+    for (let s = 1; s <= SEGS_PER_ARC; s++) {
+      const f = s / SEGS_PER_ARC;
+      let curX = ux + nx * arcLen * f;
+      let curY = uy + ny * arcLen * f;
+      let curZ = uz + nz * arcLen * f;
+
+      if (s < SEGS_PER_ARC) {
+        const jFreq = now * 0.038 + seed + s * 4.2;
+        const jAmp = (1.0 - Math.abs(f - 0.5) * 1.5) * 0.45;
+        const j1 = Math.sin(jFreq) * jAmp;
+        const j2 = Math.cos(jFreq * 1.3) * jAmp;
+        curX += px * j1 + qx * j2;
+        curY += py * j1 + qy * j2;
+        curZ += pz * j1 + qz * j2;
+      }
+
+      pos[vertPtr]     = lastX; pos[vertPtr + 1] = lastY; pos[vertPtr + 2] = lastZ;
+      pos[vertPtr + 3] = curX;  pos[vertPtr + 4] = curY;  pos[vertPtr + 5] = curZ;
+
+      const isRed = (s % 2 === 0);
+      col[vertPtr]     = 1.0; col[vertPtr + 1] = isRed ? 0.22 : 0.85; col[vertPtr + 2] = 0.10;
+      col[vertPtr + 3] = 1.0; col[vertPtr + 4] = isRed ? 0.22 : 0.85; col[vertPtr + 5] = 0.10;
+
+      vertPtr += 6;
+      lastX = curX; lastY = curY; lastZ = curZ;
+    }
+    arcsDrawn++;
+
+    // Arc 2: Micro static crackle above user antenna
+    if (arcsDrawn < MAX_INTERF_ARCS) {
+      let cLastX = ux, cLastY = uy, cLastZ = uz;
+      const crackleH = 1.25;
+      for (let s = 1; s <= SEGS_PER_ARC; s++) {
+        const f = s / SEGS_PER_ARC;
+        let cCurX = ux;
+        let cCurY = uy + crackleH * f;
+        let cCurZ = uz;
+
+        if (s < SEGS_PER_ARC) {
+          const cFreq = now * 0.05 + seed * 2.1 + s * 5.7;
+          const cAmp = 0.28 * Math.sin(f * Math.PI);
+          cCurX += Math.sin(cFreq) * cAmp;
+          cCurZ += Math.cos(cFreq * 1.1) * cAmp;
+        }
+
+        pos[vertPtr]     = cLastX; pos[vertPtr + 1] = cLastY; pos[vertPtr + 2] = cLastZ;
+        pos[vertPtr + 3] = cCurX;  pos[vertPtr + 4] = cCurY;  pos[vertPtr + 5] = cCurZ;
+
+        const isYellow = (s % 2 === 1);
+        col[vertPtr]     = 1.0; col[vertPtr + 1] = isYellow ? 0.9 : 0.15; col[vertPtr + 2] = 0.10;
+        col[vertPtr + 3] = 1.0; col[vertPtr + 4] = isYellow ? 0.9 : 0.15; col[vertPtr + 5] = 0.10;
+
+        vertPtr += 6;
+        cLastX = cCurX; cLastY = cCurY; cLastZ = cCurZ;
+      }
+      arcsDrawn++;
+    }
+  }
+
+  const vertCount = vertPtr / 3;
+  interfArcGeo.setDrawRange(0, vertCount);
+  if (vertCount > 0) {
+    interfArcGeo.attributes.position.needsUpdate = true;
+    interfArcGeo.attributes.color.needsUpdate = true;
+    interfArcMesh.visible = true;
+  } else {
+    interfArcMesh.visible = false;
+  }
 }
 
 // Camera State
@@ -1942,12 +3632,223 @@ function placeCam() {
   camera.lookAt(cam.tx, 0, cam.tz);
 }
 
+// ================= CINEMATIC POST-PROCESSING PIPELINE (144 FPS) =================
+function createCinematicPostPipeline(renderer, scene, camera, glElement) {
+  let width = glElement.clientWidth || 900;
+  let height = glElement.clientHeight || 500;
+  let pr = renderer.getPixelRatio();
+
+  const isWebGL2 = renderer.capabilities && renderer.capabilities.isWebGL2;
+  const hasHalfFloat = isWebGL2 || (renderer.extensions && !!renderer.extensions.get('OES_texture_half_float'));
+  const rtType = hasHalfFloat ? THREE.HalfFloatType : THREE.UnsignedByteType;
+
+  const rtOptions = {
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    format: THREE.RGBAFormat,
+    type: rtType,
+    stencilBuffer: false,
+    depthBuffer: true
+  };
+
+  const rtScene = new THREE.WebGLRenderTarget(Math.floor(width * pr), Math.floor(height * pr), rtOptions);
+
+  const bloomW = Math.max(1, Math.floor((width * pr) / 2));
+  const bloomH = Math.max(1, Math.floor((height * pr) / 2));
+
+  const rtBloomOpt = {
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    format: THREE.RGBAFormat,
+    type: rtType,
+    stencilBuffer: false,
+    depthBuffer: false
+  };
+  const rtBloomA = new THREE.WebGLRenderTarget(bloomW, bloomH, rtBloomOpt);
+  const rtBloomB = new THREE.WebGLRenderTarget(bloomW, bloomH, rtBloomOpt);
+
+  const orthoCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const quadGeo = new THREE.PlaneGeometry(2, 2);
+  const quadMesh = new THREE.Mesh(quadGeo, null);
+  const postScene = new THREE.Scene();
+  postScene.add(quadMesh);
+
+  // 1. Highlight extraction shader with smooth quadratic knee
+  const matExtract = new THREE.ShaderMaterial({
+    uniforms: {
+      tDiffuse: { value: null },
+      threshold: { value: 0.65 },
+      knee: { value: 0.25 }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position.xy, 0.0, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D tDiffuse;
+      uniform float threshold;
+      uniform float knee;
+      varying vec2 vUv;
+      void main() {
+        vec4 col = texture2D(tDiffuse, vUv);
+        float luma = dot(col.rgb, vec3(0.2126, 0.7152, 0.0722));
+        float soft = clamp((luma - threshold + knee) / (2.0 * knee), 0.0, 1.0);
+        float factor = soft * soft;
+        gl_FragColor = vec4(col.rgb * factor, 1.0);
+      }
+    `,
+    depthTest: false,
+    depthWrite: false
+  });
+
+  // 2. High-performance separable Gaussian blur (bilinear 5-tap for 9-tap coverage)
+  const matBlur = new THREE.ShaderMaterial({
+    uniforms: {
+      tDiffuse: { value: null },
+      direction: { value: new THREE.Vector2(1, 0) },
+      resolution: { value: new THREE.Vector2(bloomW, bloomH) },
+      radius: { value: 2.4 }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position.xy, 0.0, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D tDiffuse;
+      uniform vec2 direction;
+      uniform vec2 resolution;
+      uniform float radius;
+      varying vec2 vUv;
+      void main() {
+        vec2 step = (direction * radius) / resolution;
+        vec3 col = texture2D(tDiffuse, vUv).rgb * 0.227027;
+        col += texture2D(tDiffuse, vUv + step * 1.384615).rgb * 0.316216;
+        col += texture2D(tDiffuse, vUv - step * 1.384615).rgb * 0.316216;
+        col += texture2D(tDiffuse, vUv + step * 3.230769).rgb * 0.070270;
+        col += texture2D(tDiffuse, vUv - step * 3.230769).rgb * 0.070270;
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `,
+    depthTest: false,
+    depthWrite: false
+  });
+
+  // 3. Composite Shader: Additive Bloom + ACES Filmic Tone Mapping + Subtle Vignette
+  const matComposite = new THREE.ShaderMaterial({
+    uniforms: {
+      tScene: { value: null },
+      tBloom: { value: null },
+      bloomStrength: { value: nightMode ? 0.85 : 0.25 },
+      exposure: { value: nightMode ? 1.15 : 1.0 },
+      vignetteStrength: { value: nightMode ? 0.34 : 0.18 }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position.xy, 0.0, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D tScene;
+      uniform sampler2D tBloom;
+      uniform float bloomStrength;
+      uniform float exposure;
+      uniform float vignetteStrength;
+      varying vec2 vUv;
+
+      vec3 ACESFilmic(vec3 x) {
+        const float a = 2.51;
+        const float b = 0.03;
+        const float c = 2.43;
+        const float d = 0.59;
+        const float e = 0.14;
+        return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+      }
+
+      void main() {
+        vec4 scene = texture2D(tScene, vUv);
+        vec4 bloom = texture2D(tBloom, vUv);
+
+        vec3 hdr = scene.rgb + bloom.rgb * bloomStrength;
+        vec3 ldr = ACESFilmic(hdr * exposure);
+
+        vec2 uv = (vUv - 0.5) * 2.0;
+        float dist = length(uv);
+        float vig = smoothstep(1.48, 0.56, dist);
+        ldr *= mix(1.0, vig, vignetteStrength);
+
+        gl_FragColor = vec4(ldr, scene.a);
+      }
+    `,
+    depthTest: false,
+    depthWrite: false
+  });
+
+  return {
+    enabled: !isMobile,
+    setExposure(exp) { matComposite.uniforms.exposure.value = exp; },
+    setBloomStrength(str) { matComposite.uniforms.bloomStrength.value = str; },
+    setVignette(vig) { matComposite.uniforms.vignetteStrength.value = vig; },
+    setSize(w, h) {
+      width = w; height = h;
+      pr = renderer.getPixelRatio();
+      const sw = Math.floor(width * pr);
+      const sh = Math.floor(height * pr);
+      rtScene.setSize(sw, sh);
+      const bw = Math.max(1, Math.floor(sw / 2));
+      const bh = Math.max(1, Math.floor(sh / 2));
+      rtBloomA.setSize(bw, bh);
+      rtBloomB.setSize(bw, bh);
+      matBlur.uniforms.resolution.value.set(bw, bh);
+    },
+    render(targetScene, targetCam) {
+      renderer.setRenderTarget(rtScene);
+      renderer.render(targetScene, targetCam);
+
+      matExtract.uniforms.tDiffuse.value = rtScene.texture;
+      quadMesh.material = matExtract;
+      renderer.setRenderTarget(rtBloomA);
+      renderer.render(postScene, orthoCam);
+
+      matBlur.uniforms.tDiffuse.value = rtBloomA.texture;
+      matBlur.uniforms.direction.value.set(1.0, 0.0);
+      matBlur.uniforms.radius.value = 2.4;
+      quadMesh.material = matBlur;
+      renderer.setRenderTarget(rtBloomB);
+      renderer.render(postScene, orthoCam);
+
+      matBlur.uniforms.tDiffuse.value = rtBloomB.texture;
+      matBlur.uniforms.direction.value.set(0.0, 1.0);
+      matBlur.uniforms.radius.value = 2.4;
+      renderer.setRenderTarget(rtBloomA);
+      renderer.render(postScene, orthoCam);
+
+      matComposite.uniforms.tScene.value = rtScene.texture;
+      matComposite.uniforms.tBloom.value = rtBloomA.texture;
+      quadMesh.material = matComposite;
+      renderer.setRenderTarget(null);
+      renderer.render(postScene, orthoCam);
+    }
+  };
+}
+
+const postPipeline = createCinematicPostPipeline(R, sc, camera, gl);
+
 // ================= GRAPHICS PRESETS: ULTRA / HIGH / ECO =================
-let gfxQuality = localStorage.getItem('radnet_gfx_preset') || (isMobile ? 'eco' : 'ultra');
+let gfxQuality = isMobile ? 'eco' : (localStorage.getItem('radnet_gfx_preset') || 'ultra');
 
 function setGraphicsQuality(q) {
   gfxQuality = q;
-  try { localStorage.setItem('radnet_gfx_preset', q); } catch (_) {}
+  if (!isMobile) {
+    try { localStorage.setItem('radnet_gfx_preset', q); } catch (_) {}
+  }
   const isUltra = (q === 'ultra');
   const isHigh = (q === 'high');
   const isEco = (q === 'eco');
@@ -1957,19 +3858,22 @@ function setGraphicsQuality(q) {
     btn.innerHTML = isUltra ? '🚀 Ultra' : isHigh ? '🔷 High' : '⚡ Эко';
     btn.className = `btn ${isEco ? '' : 'on'}`;
     btn.title = `Качество 3D-графики: ${
-      isUltra ? 'Ultra (Мягкие тени 2K, Отражения, Крыши, Звезды)' :
-      isHigh ? 'High (Тени 1K, Улицы, Звезды)' :
-      'Eco (Максимальный FPS, без теней, сбережение батареи)'
+      isUltra ? 'Ultra (Bloom-свечение, ACES Filmic, Мягкие тени 2K, Мокрый асфальт, Металл)' :
+      isHigh ? 'High (Bloom-свечение, Тени 1K, Улицы, Звезды)' :
+      'Eco (Максимальный FPS, без пост-процессинга и теней, сбережение батареи)'
     } — нажми для переключения`;
   }
 
-  if (isEco) {
-    R.shadowMap.enabled = false;
-    dirLight.castShadow = false;
-  } else {
-    R.shadowMap.enabled = true;
+  const enablePost = !isMobile && !isEco;
+  const enableShadows = !isMobile && !isEco;
+
+  if (typeof postPipeline !== 'undefined' && postPipeline) postPipeline.enabled = enablePost;
+  R.shadowMap.enabled = enableShadows;
+  dirLight.castShadow = enableShadows;
+
+  if (enableShadows) {
+    R.shadowMap.autoUpdate = false;
     R.shadowMap.type = isUltra ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
-    dirLight.castShadow = true;
     const sSize = isUltra ? 2048 : 1024;
     dirLight.shadow.mapSize.set(sSize, sSize);
     if (dirLight.shadow.map) {
@@ -1997,21 +3901,55 @@ function setGraphicsQuality(q) {
     starField.visible = nightMode && !isEco;
   }
 
+  if (typeof ParkG !== 'undefined' && ParkG) {
+    ParkG.visible = !isEco;
+  }
+
+  // Toggle Volumetric Sector Beams & VFX Systems
+  SG.children.forEach(g => {
+    if (g.userData && g.userData.volBeams) {
+      g.userData.volBeams.forEach(b => { b.visible = !isEco; });
+    }
+  });
+
+  if (!isEco && typeof volBeamMaterials !== 'undefined') {
+    volBeamMaterials.forEach(m => {
+      m.uniforms.uOpacity.value = isUltra ? (nightMode ? 0.38 : 0.26) : (nightMode ? 0.26 : 0.18);
+    });
+  }
+
+  if (typeof pingGroup !== 'undefined') pingGroup.visible = !isEco;
+  if (typeof interfArcMesh !== 'undefined' && isEco) interfArcMesh.visible = false;
+
   if (isUltra) {
-    groundMat.roughness = nightMode ? 0.38 : 0.70;
-    groundMat.metalness = nightMode ? 0.32 : 0.12;
+    groundMat.normalMap = asphaltTex.normal;
+    groundMat.roughnessMap = asphaltTex.roughness;
+    groundMat.roughness = nightMode ? 0.22 : 0.68;
+    groundMat.metalness = nightMode ? 0.45 : 0.10;
+    groundMat.normalScale.set(nightMode ? 0.42 : 0.22, nightMode ? 0.42 : 0.22);
+    mTower.metalness = 0.92;
+    mTower.roughness = 0.18;
     mBDefault.roughness = 0.38;
     mBDefault.metalness = 0.24;
-    R.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio || 1, 1.5) : Math.min(window.devicePixelRatio || 1, 2));
+    R.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio || 1, 1.0) : Math.min(window.devicePixelRatio || 1, 2));
   } else if (isHigh) {
-    groundMat.roughness = nightMode ? 0.55 : 0.78;
-    groundMat.metalness = 0.15;
+    groundMat.normalMap = asphaltTex.normal;
+    groundMat.roughnessMap = asphaltTex.roughness;
+    groundMat.roughness = nightMode ? 0.35 : 0.76;
+    groundMat.metalness = nightMode ? 0.30 : 0.10;
+    groundMat.normalScale.set(nightMode ? 0.32 : 0.16, nightMode ? 0.32 : 0.16);
+    mTower.metalness = 0.85;
+    mTower.roughness = 0.25;
     mBDefault.roughness = 0.50;
     mBDefault.metalness = 0.15;
-    R.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    R.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio || 1, 1.0) : Math.min(window.devicePixelRatio || 1, 1.5));
   } else {
+    groundMat.normalMap = null;
+    groundMat.roughnessMap = null;
     groundMat.roughness = 0.90;
     groundMat.metalness = 0.0;
+    mTower.metalness = 0.40;
+    mTower.roughness = 0.50;
     mBDefault.roughness = 0.65;
     mBDefault.metalness = 0.05;
     R.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.0));
@@ -2022,7 +3960,7 @@ function setGraphicsQuality(q) {
       obj.material.needsUpdate = true;
     }
   });
-  if (R.shadowMap.enabled) R.shadowMap.needsUpdate = true;
+  invalidateShadows();
   rd();
 }
 
@@ -2032,39 +3970,75 @@ function applyTheme() {
   $('#btnTheme').classList.toggle('on', nightMode);
   if (sc.fog) sc.fog.color.setHex(nightMode ? 0x090d16 : 0xf4f7fb);
 
-  if (nightMode) {
-    ambLight.color.setHex(0x1e293b);
-    ambLight.intensity = 0.55;
-    dirLight.color.setHex(0x93c5fd);
-    dirLight.intensity = 0.70;
-    dirLight.position.set(-35, 68, -28);
-    groundMat.color.setHex(0x070c18);
-  } else {
-    ambLight.color.setHex(0xe2e8f0);
-    ambLight.intensity = 0.85;
-    dirLight.color.setHex(0xfff5e6);
-    dirLight.intensity = 1.05;
-    dirLight.position.set(40, 75, 35);
-    groundMat.color.setHex(0xdbe3ed);
+  R.toneMapping = THREE.ACESFilmicToneMapping;
+  R.toneMappingExposure = nightMode ? 1.15 : 1.0;
+
+  if (typeof postPipeline !== 'undefined' && postPipeline) {
+    postPipeline.setExposure(nightMode ? 1.15 : 1.0);
+    postPipeline.setBloomStrength(nightMode ? 0.85 : 0.25);
+    postPipeline.setVignette(nightMode ? 0.34 : 0.18);
   }
 
-  gridHelper.material.opacity = nightMode ? 0.35 : 0.22;
-  mBDefault.map = nightMode ? bTexNight : bTexDay;
-  mBDefault.needsUpdate = true;
+  if (nightMode) {
+    ambLight.color.setHex(0x131a2e);
+    ambLight.intensity = 0.45;
+    dirLight.color.setHex(0xa5c9ff);
+    dirLight.intensity = 0.85;
+    dirLight.position.set(-35, 68, -28);
+    groundMat.color.setHex(0xffffff);
+  } else {
+    ambLight.color.setHex(0xdce7f5);
+    ambLight.intensity = 0.75;
+    dirLight.color.setHex(0xfff8ee);
+    dirLight.intensity = 1.15;
+    dirLight.position.set(40, 75, 35);
+    groundMat.color.setHex(0xffffff);
+  }
+
+  groundMat.map = nightMode ? roadTexNight : roadTexDay;
+  groundMat.roughness = nightMode ? 0.32 : 0.65;
+  groundMat.metalness = nightMode ? 0.38 : 0.12;
+  groundMat.needsUpdate = true;
+
+  if (typeof mCurb !== 'undefined') {
+    mCurb.color.setHex(nightMode ? 0x06b6d4 : 0x94a3b8);
+    mCurb.emissive.setHex(nightMode ? 0x06b6d4 : 0x000000);
+    mCurb.emissiveIntensity = nightMode ? 1.6 : 0;
+    mCurb.needsUpdate = true;
+  }
+
+  if (typeof mParkLawn !== 'undefined') {
+    mParkLawn.color.setHex(nightMode ? 0x064e3b : 0x15803d);
+    mParkLawn.needsUpdate = true;
+  }
+
+  gridHelper.material.opacity = nightMode ? 0.18 : 0.12;
+  if (typeof mBDefault !== 'undefined' && mBDefault) {
+    mBDefault.map = nightMode ? bTexNight : bTexDay;
+    mBDefault.emissiveIntensity = nightMode ? 1.45 : 0.0;
+    mBDefault.needsUpdate = true;
+  }
 
   if (typeof starField !== 'undefined') {
     starField.visible = nightMode && (gfxQuality !== 'eco');
   }
 
-  if (typeof lampBulbMeshes !== 'undefined') {
-    lampBulbMeshes.forEach(b => {
-      b.material.color.setHex(nightMode ? 0xfff0b3 : 0x71717a);
+  if (typeof volBeamMaterials !== 'undefined') {
+    const isUltra = (gfxQuality === 'ultra');
+    volBeamMaterials.forEach(m => {
+      m.uniforms.uOpacity.value = isUltra ? (nightMode ? 0.38 : 0.26) : (nightMode ? 0.26 : 0.18);
     });
   }
-  if (typeof lampPoolMeshes !== 'undefined') {
-    lampPoolMeshes.forEach(p => {
-      p.material.opacity = nightMode ? 0.45 : 0.0;
-    });
+
+  if (typeof mLampBulb !== 'undefined') {
+    if (nightMode) {
+      mLampBulb.color.setRGB(2.5, 2.1, 1.3);
+    } else {
+      mLampBulb.color.setHex(0x71717a);
+    }
+  }
+  if (typeof mLampPool !== 'undefined') {
+    mLampPool.opacity = nightMode ? 0.45 : 0.0;
   }
   if (typeof streetPointLights !== 'undefined') {
     streetPointLights.forEach(pl => {
@@ -2079,11 +4053,19 @@ function applyTheme() {
   });
 
   setGraphicsQuality(gfxQuality);
+  invalidateShadows();
   rd();
 }
 
+let buildingGrowthActive = true, buildingGrowthEndTime = 0;
+
 function build3dScene() {
-  BG.clear(); UG.clear();
+  RoadG.clear(); ParkG.clear(); BG.clear(); UG.clear();
+  buildingGrowthActive = true;
+  buildingGrowthEndTime = performance.now() + 1150;
+
+  buildRoadCurbs();
+  buildParkAndTrees();
 
   let tallestB = B[0] || null;
   B.forEach(b => {
@@ -2196,6 +4178,68 @@ function build3dScene() {
       }
     }
 
+    // Glass Sky-Terrace / Cantilevered observation deck on tall highrises
+    if (b.h3d >= 2.0 && b.w >= 26) {
+      const terrW = 1.4 * invW;
+      const terrY = 0.04 * invY;
+      const terrD = 0.65 * invH;
+      const gTerr = new THREE.BoxGeometry(terrW, terrY, terrD);
+      const mTerr = new THREE.MeshStandardMaterial({
+        color: 0x67e8f9,
+        transparent: true,
+        opacity: 0.6,
+        roughness: 0.1,
+        metalness: 0.85
+      });
+      const terrMesh = new THREE.Mesh(gTerr, mTerr);
+      terrMesh.position.set(0, 0.22, 0.52 + terrD / 2);
+      terrMesh.castShadow = true;
+
+      const gRail = new THREE.BoxGeometry(terrW, 0.15 * invY, 0.03 * invH);
+      const mRailChrome = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 });
+      const railFront = new THREE.Mesh(gRail, mRailChrome);
+      railFront.position.set(0, 0.22 + 0.09 * invY, 0.52 + terrD);
+      roofDetails.add(terrMesh, railFront);
+    }
+
+    // Cyberpunk corner vertical neon accent strips
+    if (b.h3d >= 1.6) {
+      const neonColors = [0x00f0ff, 0xf43f5e, 0xf59e0b, 0xa855f7];
+      const neonCol = neonColors[b.id % neonColors.length];
+      const mNeonStrip = new THREE.MeshBasicMaterial({ color: neonCol });
+      const gNeonStrip = new THREE.BoxGeometry(0.03 * invW, 0.98, 0.03 * invH);
+
+      [-0.49, 0.49].forEach(cx => {
+        [-0.49, 0.49].forEach(cz => {
+          const strip = new THREE.Mesh(gNeonStrip, mNeonStrip);
+          strip.position.set(cx, 0, cz);
+          roofDetails.add(strip);
+        });
+      });
+    }
+
+    // Rooftop glowing corporate logos & billboards
+    if (b.h3d >= 2.4 && (b.id % 5 === 0)) {
+      const brandNames = ['5G CORE', 'NEXUS', 'CYBERNET', 'QUANTUM', 'HYPER', 'ORBIT'];
+      const brand = brandNames[b.id % brandNames.length];
+      const brandColor = b.id % 2 === 0 ? '#38bdf8' : '#f59e0b';
+      const logoTex = makeCyberLogoTexture(brand, brandColor);
+
+      const signW = 1.6 * invW;
+      const signH = 0.55 * invY;
+      const gSign = new THREE.BoxGeometry(signW, signH, 0.08 * invH);
+      const mSign = new THREE.MeshStandardMaterial({
+        map: logoTex,
+        roughness: 0.3,
+        emissive: new THREE.Color(brandColor),
+        emissiveMap: logoTex,
+        emissiveIntensity: nightMode ? 1.4 : 0.2
+      });
+      const signMesh = new THREE.Mesh(gSign, mSign);
+      signMesh.position.set(0, 0.58 + signH / 2, 0);
+      roofDetails.add(signMesh);
+    }
+
     roofDetails.visible = (gfxQuality !== 'eco');
     grp.add(roofDetails);
     grp.position.set(X(b.x + b.w / 2), 0, Z(b.y + b.h / 2));
@@ -2205,25 +4249,45 @@ function build3dScene() {
       bodyMesh: m,
       roofMesh: roof,
       roofDetails,
-      id: b.id
+      id: b.id,
+      done: false
     };
     grp.scale.set(b.w / 10, 0.001, b.h / 10);
+    grp.matrixAutoUpdate = true;
     BG.add(grp);
   });
 
-  U.forEach(u => {
-    const grp = new THREE.Group();
-    const m = new THREE.Mesh(gUser, mBad);
-    const halo = new THREE.Mesh(gUserHalo, new THREE.MeshBasicMaterial({ color: 0xef4444, side: THREE.DoubleSide, transparent: true, opacity: 0.5 }));
-    halo.rotation.x = -Math.PI / 2;
-    halo.position.y = -0.22;
-    grp.add(m, halo);
-    grp.position.set(X(u.x), 0.32, Z(u.y));
-    grp.userData = { sphere: m, halo };
-    UG.add(grp);
-  });
+  if (U.length > 0) {
+    ugSpheres = new THREE.InstancedMesh(gUser, mUserSphere, U.length);
+    ugHalos = new THREE.InstancedMesh(gUserHalo, mUserHalo, U.length);
 
+    for (let i = 0; i < U.length; i++) {
+      const u = U[i];
+      _ugDummy.position.set(X(u.x), 0.32, Z(u.y));
+      _ugDummy.rotation.set(0, 0, 0);
+      _ugDummy.scale.set(1, 1, 1);
+      _ugDummy.updateMatrix();
+      ugSpheres.setMatrixAt(i, _ugDummy.matrix);
+
+      _ugDummy.position.set(X(u.x), 0.10, Z(u.y));
+      _ugDummy.rotation.set(-Math.PI / 2, 0, 0);
+      _ugDummy.updateMatrix();
+      ugHalos.setMatrixAt(i, _ugDummy.matrix);
+
+      ugSpheres.setColorAt(i, colBad);
+      ugHalos.setColorAt(i, colBad);
+    }
+    ugSpheres.instanceMatrix.needsUpdate = true;
+    ugHalos.instanceMatrix.needsUpdate = true;
+    if (ugSpheres.instanceColor) ugSpheres.instanceColor.needsUpdate = true;
+    if (ugHalos.instanceColor) ugHalos.instanceColor.needsUpdate = true;
+
+    UG.add(ugSpheres, ugHalos);
+  }
+
+  initUserBuffers();
   buildStreetLamps();
+  invalidateShadows();
 }
 
 function syncStations3D() {
@@ -2236,79 +4300,70 @@ function syncStations3D() {
     const mode = s.mode || (s.sec ? '3sec' : 'omni');
     const tiltRad = (s.tilt || 0) * Math.PI / 180;
 
-    // Mast
-    const tw = new THREE.Mesh(gTower, mTower);
-    tw.scale.y = h;
-    tw.position.y = h / 2;
-    tw.castShadow = (gfxQuality !== 'eco');
-    g.add(tw);
+    // Realistic Openwork Lattice Tower, 3GPP Panel Antennas, RRUs, Grounding Loop
+    const { avBeacon, rruLeds } = buildLatticeTower(g, s, col, h, mode, tiltRad);
 
-    // Glowing Top Beacon
-    const bc = new THREE.Mesh(gBeacon, new THREE.MeshBasicMaterial({ color: col }));
-    bc.position.y = h + 0.3;
-    bc.castShadow = (gfxQuality !== 'eco');
-    g.add(bc);
-
-    // Red Aviation Obstruction Warning Beacon for tall towers (h >= 30m)
-    let avBeacon = null;
-    if (s.h >= 30) {
-      avBeacon = new THREE.Mesh(
-        new THREE.SphereGeometry(0.18, 12, 10),
-        new THREE.MeshBasicMaterial({ color: 0xff2222, transparent: true, opacity: 0.9 })
-      );
-      avBeacon.position.y = h + 0.55;
-      g.add(avBeacon);
-    }
-
-    // 3D Volumetric Sector Cones & Antenna Panels
+    // 3D Volumetric Sector Cones & Coverage Beams
     const beamRadius = 6 + (s.p - 30) * 0.55;
+    const volBeams = [];
     if (mode === '6sec') {
       for (let k = 0; k < 6; k++) {
         const a = (s.az + k * 60) * Math.PI / 180;
-        const p = new THREE.Mesh(gPanel, new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.5 }));
-        p.position.set(Math.cos(a) * 0.42, h - 0.15, Math.sin(a) * 0.42);
-        p.rotation.y = -a;
-        p.rotation.x = tiltRad;
-        p.castShadow = (gfxQuality !== 'eco');
-        g.add(p);
+        const px = Math.cos(a) * 0.42, py = h - 0.15, pz = Math.sin(a) * 0.42;
+
+        const beam = new THREE.Mesh(gVolSector6, volBeamMaterials[s.ch]);
+        beam.position.set(px, py, pz);
+        beam.rotation.set(tiltRad, Math.PI / 2 - a, 0, 'YXZ');
+        beam.scale.set(beamRadius, beamRadius * 0.55, beamRadius);
+        beam.visible = (gfxQuality !== 'eco');
+        g.add(beam);
+        volBeams.push(beam);
 
         const wedge = new THREE.Mesh(
           gSectorBeam6,
-          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: nightMode ? 0.16 : 0.12, side: THREE.DoubleSide, depthWrite: false })
+          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: nightMode ? 0.08 : 0.05, side: THREE.DoubleSide, depthWrite: false })
         );
         wedge.scale.setScalar(beamRadius);
         wedge.rotation.y = -a;
-        wedge.rotation.x = tiltRad;
-        wedge.position.y = 0.08;
+        wedge.position.y = 0.07;
         g.add(wedge);
       }
     } else if (mode === '3sec') {
       for (let k = 0; k < 3; k++) {
         const a = (s.az + k * 120) * Math.PI / 180;
-        const p = new THREE.Mesh(gPanel, new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.5 }));
-        p.position.set(Math.cos(a) * 0.42, h - 0.15, Math.sin(a) * 0.42);
-        p.rotation.y = -a;
-        p.rotation.x = tiltRad;
-        p.castShadow = (gfxQuality !== 'eco');
-        g.add(p);
+        const px = Math.cos(a) * 0.42, py = h - 0.15, pz = Math.sin(a) * 0.42;
+
+        const beam = new THREE.Mesh(gVolSector3, volBeamMaterials[s.ch]);
+        beam.position.set(px, py, pz);
+        beam.rotation.set(tiltRad, Math.PI / 2 - a, 0, 'YXZ');
+        beam.scale.set(beamRadius, beamRadius * 0.55, beamRadius);
+        beam.visible = (gfxQuality !== 'eco');
+        g.add(beam);
+        volBeams.push(beam);
 
         const wedge = new THREE.Mesh(
           gSectorBeam,
-          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: nightMode ? 0.16 : 0.12, side: THREE.DoubleSide, depthWrite: false })
+          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: nightMode ? 0.08 : 0.05, side: THREE.DoubleSide, depthWrite: false })
         );
         wedge.scale.setScalar(beamRadius);
         wedge.rotation.y = -a;
-        wedge.rotation.x = tiltRad;
-        wedge.position.y = 0.08;
+        wedge.position.y = 0.07;
         g.add(wedge);
       }
     } else {
       const omni = new THREE.Mesh(
         new THREE.CircleGeometry(beamRadius * 0.75, 36).rotateX(-Math.PI / 2),
-        new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.11, depthWrite: false })
+        new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.07, depthWrite: false })
       );
-      omni.position.y = 0.08;
+      omni.position.y = 0.07;
       g.add(omni);
+
+      const omniVol = new THREE.Mesh(gVolOmni, volBeamMaterials[s.ch]);
+      omniVol.position.set(0, h - 0.15, 0);
+      omniVol.scale.set(beamRadius * 0.75, beamRadius * 0.45, beamRadius * 0.75);
+      omniVol.visible = (gfxQuality !== 'eco');
+      g.add(omniVol);
+      volBeams.push(omniVol);
     }
 
     // Animated Expanding Wave Rings
@@ -2327,10 +4382,11 @@ function syncStations3D() {
       g.add(sr);
     }
 
-    g.userData = { s, rings, h, avBeacon };
+    g.userData = { s, rings, h, avBeacon, rruLeds, doneGrowth: false, volBeams };
     g.position.set(X(s.x), 0, Z(s.y));
     SG.add(g);
   });
+  invalidateShadows();
 }
 
 let cachedHeatmapImageData = null;
@@ -2376,14 +4432,22 @@ function computeHeatmapAndSubscribers() {
   tex.needsUpdate = true;
 
   _connCounts.fill(0);
-  U.forEach(u => {
-    u.g = S.length ? sig(u.x, u.y) : null;
-    if (u.g && u.g.r >= -105 && u.g.q >= 0 && u.g.i < 32) {
-      _connCounts[u.g.i]++;
+  const uLen = U.length;
+  for (let i = 0; i < uLen; i++) {
+    const u = U[i];
+    if (!u.g) u.g = { r: -999, q: -999, i: -1 };
+    if (S.length) {
+      calcSubscriberSignal(u.x, u.y, u.g);
+      if (u.g.r >= -105 && u.g.q >= 0 && u.g.i < 32) {
+        _connCounts[u.g.i]++;
+      }
+    } else {
+      u.g.r = -999; u.g.q = -999; u.g.i = -1;
     }
-  });
+  }
 
-  U.forEach((u, i) => {
+  for (let i = 0; i < uLen; i++) {
+    const u = U[i];
     const g = u.g;
     const good = g && g.r >= -105 && g.q >= 0;
     if (good) {
@@ -2396,39 +4460,75 @@ function computeHeatmapAndSubscribers() {
     } else {
       u.rate = 0;
     }
-    const grp = UG.children[i];
-    if (grp) {
-      grp.userData.sphere.material = good ? mOk : mBad;
-      grp.userData.halo.material.color.setHex(good ? 0x22c55e : 0xef4444);
-    }
-  });
+  }
+  updateSubscriberColors();
   updateStats(ok, sum);
 }
 
-// Update 3D Ray-Tracing Inspector on Hover
-function updateRayInspector() {
-  BG.children.forEach(grp => { grp.userData.bodyMesh.material = mBDefault; });
-  const hud = $('#rayHud');
+// 144Hz Separated Zero-Layout-Thrashing Ray-Tracing Inspector
+let rayInspectorActive = false;
+const prevHitBuildings = [];
+let lastInspectorX = -9999, lastInspectorY = -9999;
+let lastHudSx = -9999, lastHudSy = -9999;
 
+function hideRayInspector() {
+  if (!rayInspectorActive) return;
+  serveLine.visible = false;
+  interfLine.visible = false;
+  targetMarker.visible = false;
+  if (domNodes.rayHud) domNodes.rayHud.className = 'ray-hud';
+  if (prevHitBuildings.length > 0) {
+    for (let i = 0; i < prevHitBuildings.length; i++) {
+      const bGrp = BG.children[prevHitBuildings[i]];
+      if (bGrp && bGrp.userData.bodyMesh) bGrp.userData.bodyMesh.material = mBDefault;
+    }
+    prevHitBuildings.length = 0;
+  }
+  rayInspectorActive = false;
+  lastInspectorX = -9999;
+  lastInspectorY = -9999;
+}
+
+// Calculate 3D Ray Physics & line vertices (only called when mouse moves or stations change)
+function updateRayPhysics() {
   if (!hoverPt || !S.length || dragMode === 'orbit') {
-    serveLine.visible = false;
-    interfLine.visible = false;
-    targetMarker.visible = false;
-    hud.className = 'ray-hud';
+    hideRayInspector();
     return;
   }
 
-  const [px, py] = hoverPt;
-  const g = sig(px, py);
-  if (!g) return;
+  const px = hoverPt[0], py = hoverPt[1];
+  if (px === lastInspectorX && py === lastInspectorY && !dirty) {
+    return;
+  }
+  lastInspectorX = px;
+  lastInspectorY = py;
 
+  const g = sig(px, py);
+  if (!g) {
+    hideRayInspector();
+    return;
+  }
+
+  rayInspectorActive = true;
   const st = S[g.i];
   const det = rxDetail(st, px, py);
 
-  // Highlight buildings blocking the ray in 3D!
+  // Restore only previous hit buildings (O(1) instead of resetting all buildings O(N))
+  if (prevHitBuildings.length > 0) {
+    for (let i = 0; i < prevHitBuildings.length; i++) {
+      const bGrp = BG.children[prevHitBuildings[i]];
+      if (bGrp && bGrp.userData.bodyMesh) bGrp.userData.bodyMesh.material = mBDefault;
+    }
+    prevHitBuildings.length = 0;
+  }
+
+  // Highlight new hit buildings
   det.hitBuildings.forEach(bIdx => {
     const bGrp = BG.children[bIdx];
-    if (bGrp) bGrp.userData.bodyMesh.material = mBHit;
+    if (bGrp && bGrp.userData.bodyMesh) {
+      bGrp.userData.bodyMesh.material = mBHit;
+      prevHitBuildings.push(bIdx);
+    }
   });
 
   // Update 3D Serving Ray Line
@@ -2456,90 +4556,130 @@ function updateRayInspector() {
     interfLine.visible = false;
   }
 
-  // Project 3D point to 2D screen for Floating HUD without memory allocations
+  // Update Persistent HUD Content (no innerHTML parsing at 144Hz!)
+  const good = g.r >= -105 && g.q >= 0;
+  if (domNodes.rhTitle) {
+    domNodes.rhTitle.textContent = `Станция #${g.i + 1} (${CH_NAMES[st.ch].split(' ')[0]})`;
+    domNodes.rhStatus.textContent = good ? '● На связи' : '● Обрыв';
+    domNodes.rhStatus.style.color = good ? '#22c55e' : '#ef4444';
+    domNodes.rhRsrp.textContent = `${g.r.toFixed(0)} дБм`;
+    domNodes.rhSinr.textContent = `${g.q.toFixed(1)} дБ`;
+    domNodes.rhDist.textContent = `${(det.distKm * 1000).toFixed(0)} м`;
+
+    if (det.walls > 0) {
+      domNodes.rhTip.style.display = 'block';
+      domNodes.rhTip.style.color = '#f59e0b';
+      domNodes.rhTip.textContent = `🧱 Луч пробил зданий: ${det.walls} (−${det.lossWall} дБ)`;
+    } else if (g.interfIdx >= 0 && g.q < 6) {
+      domNodes.rhTip.style.display = 'block';
+      domNodes.rhTip.style.color = '#ef4444';
+      domNodes.rhTip.textContent = `⚡ Помеха от Станции #${g.interfIdx + 1} (тот же канал)!`;
+    } else if (!good && g.r < -105) {
+      domNodes.rhTip.style.display = 'block';
+      domNodes.rhTip.style.color = '#ef4444';
+      domNodes.rhTip.textContent = '📡 Слишком далеко или закрыто домами';
+    } else {
+      domNodes.rhTip.style.display = 'none';
+    }
+  }
+
+  updateRayHudPosition();
+}
+
+// 2D Screen Projection of HUD (Fast: uses cachedCanvasRect, zero layout thrashing)
+function updateRayHudPosition() {
+  if (!rayInspectorActive || !hoverPt) return;
+  const [px, py] = hoverPt;
   const v3 = _projVec3.set(X(px), 0.8, Z(py)).project(camera);
+  const hud = domNodes.rayHud;
+  if (!hud) return;
+
   if (v3.z > 1) {
     hud.className = 'ray-hud';
     return;
   }
-  const rect = el.getBoundingClientRect();
-  const sx = (v3.x * 0.5 + 0.5) * rect.width;
-  const sy = (-v3.y * 0.5 + 0.5) * rect.height;
 
-  hud.style.left = `${Math.max(120, Math.min(rect.width - 120, sx))}px`;
-  hud.style.top = `${Math.max(90, Math.min(rect.height - 25, sy))}px`;
+  const rw = cachedCanvasRect.width;
+  const rh = cachedCanvasRect.height;
+  const sx = (v3.x * 0.5 + 0.5) * rw;
+  const sy = (-v3.y * 0.5 + 0.5) * rh;
 
-  const good = g.r >= -105 && g.q >= 0;
-  let tipHtml = '';
-  if (det.walls > 0) {
-    tipHtml = `<div class="rh-tip" style="color:#f59e0b">🧱 Луч пробил зданий: ${det.walls} (−${det.lossWall} дБ)</div>`;
+  const clampedX = Math.round(Math.max(120, Math.min(rw - 120, sx)));
+  const clampedY = Math.round(Math.max(90, Math.min(rh - 25, sy)));
+
+  if (clampedX !== lastHudSx || clampedY !== lastHudSy) {
+    hud.style.left = clampedX + 'px';
+    hud.style.top = clampedY + 'px';
+    lastHudSx = clampedX;
+    lastHudSy = clampedY;
   }
-  if (g.interfIdx >= 0 && g.q < 6) {
-    tipHtml = `<div class="rh-tip" style="color:#ef4444">⚡ Помеха от Станции #${g.interfIdx + 1} (тот же канал)!</div>`;
-  } else if (!good && g.r < -105) {
-    tipHtml = `<div class="rh-tip" style="color:#ef4444">📡 Слишком далеко или закрыто домами</div>`;
-  }
-
-  hud.innerHTML = `
-    <div class="rh-title">
-      <span>Станция #${g.i + 1} (${CH_NAMES[st.ch].split(' ')[0]})</span>
-      <span style="color:${good ? '#22c55e' : '#ef4444'}">${good ? '● На связи' : '● Обрыв'}</span>
-    </div>
-    <div class="rh-row"><span>Сила сигнала (RSRP):</span><b>${g.r.toFixed(0)} дБм</b></div>
-    <div class="rh-row"><span>Чистота (SINR):</span><b>${g.q.toFixed(1)} дБ</b></div>
-    <div class="rh-row"><span>Дистанция:</span><b>${(det.distKm * 1000).toFixed(0)} м</b></div>
-    ${tipHtml}
-  `;
   hud.className = 'ray-hud on';
 }
 
-// FPS Counter & High-Refresh Animation Loop
+function updateRayInspector() {
+  if (!hoverPt || !S.length || dragMode === 'orbit') {
+    hideRayInspector();
+  } else {
+    updateRayPhysics();
+  }
+}
+
+// FPS Counter & High-Refresh Animation Loop (144Hz Optimized)
 let last = performance.now(), frames = 0, fpsTime = performance.now(), lastHeatCompute = 0;
+let _lastBeaconBlink = null, _lastRruSysBlink = null;
+
 function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
 
-  // Measure real FPS
+  // Measure real FPS with zero DOM thrashing
   frames++;
-  if (now - fpsTime >= 600) {
+  if (now - fpsTime >= 500) {
     const fps = Math.round((frames * 1000) / (now - fpsTime));
     const qBadge = gfxQuality === 'ultra' ? '🚀 Ultra' : (gfxQuality === 'high' ? '🔷 High' : '⚡ Eco');
-    $('#fpsBadge').textContent = `${fps} FPS · ${qBadge}`;
+    const badgeText = `${fps} FPS · ${qBadge}`;
+    if (domCache.fpsText !== badgeText) {
+      domNodes.fpsBadge.textContent = badgeText;
+      domCache.fpsText = badgeText;
+    }
     frames = 0; fpsTime = now;
   }
 
-  // Live Moving Subscribers
-  if (liveTraffic && U.length) {
-    U.forEach((u, idx) => {
-      let nx = u.x + u.vx * dt;
-      let ny = u.y + u.vy * dt;
-      const gx = ((nx / C) | 0), gy = ((ny / C) | 0);
+  // Live Moving Subscribers (Direct Typed Array Buffer Processing)
+  const uCount = U.length;
+  if (liveTraffic && uCount > 0) {
+    for (let idx = 0; idx < uCount; idx++) {
+      let nx = uPosX[idx] + uVelX[idx] * dt;
+      let ny = uPosY[idx] + uVelY[idx] * dt;
+      const gx = (nx * INV_C) | 0, gy = (ny * INV_C) | 0;
       if (nx < 8 || nx > W - 8 || ny < 8 || ny > H - 8 || (gx >= 0 && gx < GW && gy >= 0 && gy < GH && occ[gy * GW + gx] >= 0)) {
-        u.vx = -u.vx + (Math.random() - 0.5) * 6;
-        u.vy = -u.vy + (Math.random() - 0.5) * 6;
-        u.x = Math.max(10, Math.min(W - 10, u.x));
-        u.y = Math.max(10, Math.min(H - 10, u.y));
-      } else {
-        u.x = nx; u.y = ny;
+        uVelX[idx] = -uVelX[idx] + (Math.random() - 0.5) * 6;
+        uVelY[idx] = -uVelY[idx] + (Math.random() - 0.5) * 6;
+        nx = Math.max(10, Math.min(W - 10, uPosX[idx]));
+        ny = Math.max(10, Math.min(H - 10, uPosY[idx]));
       }
-      const grp = UG.children[idx];
-      if (grp) {
-        grp.position.x = X(u.x);
-        grp.position.z = Z(u.y);
-      }
-    });
+      uPosX[idx] = nx;
+      uPosY[idx] = ny;
+      const u = U[idx];
+      u.x = nx;
+      u.y = ny;
+      u.vx = uVelX[idx];
+      u.vy = uVelY[idx];
+    }
 
-    // Recalculate subscriber connections smoothly
+    // Recalculate subscriber connections smoothly (Zero GC allocation)
     const trafficStep = gfxQuality === 'eco' ? 6 : (gfxQuality === 'high' ? 4 : 3);
     if (S.length && (frames % trafficStep === 0)) {
       let ok = 0, sum = 0;
       _connCounts.fill(0);
-      U.forEach(u => {
-        u.g = sig(u.x, u.y);
-        if (u.g && u.g.r >= -105 && u.g.q >= 0 && u.g.i < 32) _connCounts[u.g.i]++;
-      });
-      U.forEach((u, i) => {
+      for (let i = 0; i < uCount; i++) {
+        const u = U[i];
+        calcSubscriberSignal(uPosX[i], uPosY[i], u.g);
+        if (u.g.r >= -105 && u.g.q >= 0 && u.g.i < 32) _connCounts[u.g.i]++;
+      }
+      for (let i = 0; i < uCount; i++) {
+        const u = U[i];
         const g = u.g, good = g && g.r >= -105 && g.q >= 0;
         if (good) {
           ok++;
@@ -2551,12 +4691,8 @@ function loop(now) {
         } else {
           u.rate = 0;
         }
-        const grp = UG.children[i];
-        if (grp) {
-          grp.userData.sphere.material = good ? mOk : mBad;
-          grp.userData.halo.material.color.setHex(good ? 0x22c55e : 0xef4444);
-        }
-      });
+      }
+      updateSubscriberColors();
       updateStats(ok, sum);
     }
   }
@@ -2568,6 +4704,7 @@ function loop(now) {
       lastHeatCompute = now;
       computeHeatmapAndSubscribers();
       syncStations3D();
+      if (rayInspectorActive) updateRayPhysics();
     }
   }
 
@@ -2576,9 +4713,12 @@ function loop(now) {
     if (Math.abs(velAz) > 0.0001 || Math.abs(velEl) > 0.0001) {
       tg.az += velAz;
       tg.el = Math.max(0.22, Math.min(1.52, tg.el + velEl));
-      const friction = Math.exp(-6.8 * dt);
+      const friction = Math.exp(-6.5 * dt);
       velAz *= friction;
       velEl *= friction;
+    } else {
+      velAz = 0;
+      velEl = 0;
     }
   }
 
@@ -2600,24 +4740,94 @@ function loop(now) {
     }
   }
 
-  // Animate Aviation Obstacle Warning Beacons on tall towers
+  // Animate Aviation Obstacle Warning Beacons & RRU Status LEDs on towers with HDR pulse
   const beaconBlink = (Math.sin(now * 0.005) > 0.2);
-  SG.children.forEach(g => {
-    if (g.userData.avBeacon) {
-      g.userData.avBeacon.material.color.setHex(beaconBlink ? 0xff2222 : 0x440000);
+  const rruSysBlink = (Math.sin(now * 0.006) > 0);
+  if (beaconBlink !== _lastBeaconBlink || rruSysBlink !== _lastRruSysBlink) {
+    _lastBeaconBlink = beaconBlink;
+    _lastRruSysBlink = rruSysBlink;
+    SG.children.forEach((g) => {
+      if (g.userData.avBeacon) {
+        if (beaconBlink) {
+          g.userData.avBeacon.material.color.setRGB(3.0, 0.15, 0.15);
+        } else {
+          g.userData.avBeacon.material.color.setRGB(0.2, 0.02, 0.02);
+        }
+      }
+      if (g.userData.rruLeds) {
+        g.userData.rruLeds.forEach(led => {
+          if (led.userData.type === 'sys') {
+            led.material.color.setHex(rruSysBlink ? 0x22c55e : 0x052e16);
+          }
+        });
+      }
+    });
+  }
+  if (SG.children.length && (frames % 4 === 0)) {
+    SG.children.forEach((g, sIdx) => {
+      if (g.userData.rruLeds) {
+        const rruPulse = Math.sin(now * 0.024 + sIdx * 1.7) > 0.35;
+        g.userData.rruLeds.forEach(led => {
+          if (led.userData.type !== 'sys') {
+            led.material.color.setHex(rruPulse ? 0x38bdf8 : 0x082f49);
+          }
+        });
+      }
+    });
+  }
+
+  // Subtle breathing pulse for neon avenue curbs in night mode
+  if (typeof mCurb !== 'undefined' && nightMode && gfxQuality !== 'eco') {
+    mCurb.emissiveIntensity = 1.35 + 0.35 * Math.sin(now * 0.002);
+  }
+
+  // Animate Buildings Spring Growth (One-shot: matrixAutoUpdate disabled forever after growth)
+  if (buildingGrowthActive) {
+    let allFinished = true;
+    const bLen = BG.children.length;
+    for (let i = 0; i < bLen; i++) {
+      const grp = BG.children[i];
+      if (grp.userData.done) continue;
+      const progress = (now - grp.userData.t) / 680;
+      if (progress >= 1) {
+        grp.scale.y = grp.userData.h;
+        grp.position.y = grp.userData.h / 2;
+        grp.updateMatrix();
+        grp.userData.done = true;
+      } else if (progress > 0) {
+        allFinished = false;
+        const sy = Math.max(0.001, grp.userData.h * easeOutBack(progress));
+        grp.scale.y = sy;
+        grp.position.y = sy / 2;
+      } else {
+        allFinished = false;
+      }
     }
-  });
 
-  // Animate Buildings Spring Growth
-  BG.children.forEach(grp => {
-    const sy = Math.max(0.001, grp.userData.h * easeOutBack((now - grp.userData.t) / 680));
-    grp.scale.y = sy;
-    grp.position.y = sy / 2;
-  });
+    if (now >= buildingGrowthEndTime || allFinished) {
+      buildingGrowthActive = false;
+      for (let i = 0; i < bLen; i++) {
+        const grp = BG.children[i];
+        grp.scale.y = grp.userData.h;
+        grp.position.y = grp.userData.h / 2;
+        grp.matrixAutoUpdate = false;
+        grp.updateMatrixWorld(true);
+      }
+      invalidateShadows(); // Cache final static shadow map!
+    }
+  }
 
-  // Animate Base Stations & Expanding Radio Waves
+  // Animate Base Stations & Expanding Radio Waves (one-shot scale growth)
   SG.children.forEach(g => {
-    g.scale.y = Math.max(0.001, easeOutBack((now - g.userData.s.t) / 550));
+    if (!g.userData.doneGrowth) {
+      const progress = (now - g.userData.s.t) / 550;
+      if (progress >= 1) {
+        g.scale.y = 1;
+        g.userData.doneGrowth = true;
+      } else {
+        g.scale.y = Math.max(0.001, easeOutBack(progress));
+      }
+    }
     g.userData.rings.forEach((r, j) => {
       const t = (now / 2100 + j * 0.5) % 1;
       r.scale.setScalar(1 + t * 11.5);
@@ -2625,38 +4835,105 @@ function loop(now) {
     });
   });
 
-  // Animate Subscribers & Flying Data Packets
-  UG.children.forEach((grp, i) => {
-    const isBad = grp.userData.sphere.material === mBad;
-    const s = isBad ? 1 + 0.28 * Math.sin(now / 220 + i) : 1 + 0.08 * Math.sin(now / 500 + i);
-    grp.scale.setScalar(s);
-  });
+  // Animate Subscribers (InstancedMesh: 2 draw calls total, scale sine wave computed once)
+  if (ugSpheres && ugHalos && uCount > 0) {
+    const pulseBad = 1 + 0.28 * Math.sin(now * 0.005);
+    if (liveTraffic || pulseBad !== 1) {
+      for (let i = 0; i < uCount; i++) {
+        const px = (uPosX[i] - W_HALF) * 0.1;
+        const pz = (uPosY[i] - H_HALF) * 0.1;
+        const s = uGood[i] ? 1.0 : pulseBad;
+
+        // Sphere
+        _ugDummy.position.set(px, 0.32, pz);
+        _ugDummy.rotation.set(0, 0, 0);
+        _ugDummy.scale.set(s, s, s);
+        _ugDummy.updateMatrix();
+        ugSpheres.setMatrixAt(i, _ugDummy.matrix);
+
+        // Halo
+        _ugDummy.position.set(px, 0.10, pz);
+        _ugDummy.rotation.set(-Math.PI / 2, 0, 0);
+        _ugDummy.scale.set(s, s, s);
+        _ugDummy.updateMatrix();
+        ugHalos.setMatrixAt(i, _ugDummy.matrix);
+      }
+      ugSpheres.instanceMatrix.needsUpdate = true;
+      ugHalos.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  // Animate Volumetric Sector Radio Waves
+  const secTime = now * 0.001;
+  volBeamMaterials.forEach(m => { m.uniforms.uTime.value = secTime; });
 
   packets.forEach((pkt) => {
-    if (!S.length || !U.length) { pkt.mesh.visible = false; return; }
-    const u = U[pkt.uIdx % U.length];
+    if (!S.length || !uCount) { pkt.mesh.visible = false; return; }
+    const u = U[pkt.uIdx % uCount];
     if (!u || !u.g || u.g.r < -105 || u.g.q < 0) {
-      pkt.uIdx = (pkt.uIdx + 1) % Math.max(1, U.length);
+      pkt.uIdx = (pkt.uIdx + 1) % uCount;
       pkt.mesh.visible = false;
       return;
     }
     const st = S[u.g.i];
     if (!st) { pkt.mesh.visible = false; return; }
     pkt.mesh.visible = true;
-    pkt.t = (pkt.t + dt * 0.85) % 1;
+
+    pkt.t += dt * 0.95;
+    if (pkt.t >= 1.0) {
+      pkt.t = pkt.t % 1;
+      const ux = X(u.x), uz = Z(u.y);
+      triggerPulsePing(ux, 0.12, uz, CH[st.ch]);
+    }
     const t = pkt.t;
     const sx = X(st.x), sy = st.h / 7.5 + 0.3, sz = Z(st.y);
     const ux = X(u.x), uy = 0.35, uz = Z(u.y);
-    pkt.mesh.position.set(
-      sx + (ux - sx) * t,
-      sy * (1 - t) + uy * t + Math.sin(t * Math.PI) * 2.2,
-      sz + (uz - sz) * t
-    );
-    pkt.mesh.material.color.set(CH[st.ch]);
+
+    const px = sx + (ux - sx) * t;
+    const py = sy * (1 - t) + uy * t + Math.sin(t * Math.PI) * 2.2;
+    const pz = sz + (uz - sz) * t;
+
+    // Heading tangent vector of curved trajectory
+    const vx = ux - sx;
+    const vy = uy - sy + Math.PI * Math.cos(t * Math.PI) * 2.2;
+    const vz = uz - sz;
+
+    _vDir.set(vx, vy, vz).normalize();
+    pkt.mesh.quaternion.setFromUnitVectors(_vForward, _vDir);
+    pkt.mesh.position.set(px, py, pz);
+    pkt.mesh.material = laserMaterials[st.ch];
   });
 
-  updateRayInspector();
-  R.render(sc, camera);
+  // Animate Subscriber Arrival Pulse Pings
+  pingPool.forEach(ping => {
+    if (!ping.active) return;
+    ping.life += dt;
+    const progress = ping.life / ping.maxLife;
+    if (progress >= 1.0) {
+      ping.active = false;
+      ping.mesh.visible = false;
+    } else {
+      const ease = 1 - Math.pow(1 - progress, 2);
+      const s = 0.4 + ease * 3.6;
+      ping.mesh.scale.set(s, s, s);
+      ping.mesh.material.opacity = (1.0 - progress) * (nightMode ? 0.85 : 0.65);
+      ping.mesh.visible = (gfxQuality !== 'eco');
+    }
+  });
+
+  // Animate Interference Arc Discharges
+  updateInterferenceVFX(now);
+
+  // Only project Ray HUD position when active (Zero ray physics calculation per frame!)
+  if (rayInspectorActive) {
+    updateRayHudPosition();
+  }
+
+  if (typeof postPipeline !== 'undefined' && postPipeline && postPipeline.enabled) {
+    postPipeline.render(sc, camera);
+  } else {
+    R.render(sc, camera);
+  }
 }
 
 new ResizeObserver(() => {
@@ -2665,6 +4942,10 @@ new ResizeObserver(() => {
     R.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    updateCanvasRect();
+    if (typeof postPipeline !== 'undefined' && postPipeline && postPipeline.enabled) {
+      postPipeline.setSize(w, h);
+    }
   }
 }).observe(gl);
 
@@ -2674,9 +4955,10 @@ let downPos = null, dragMode = null; // 'station' | 'orbit' | 'pending' | null
 let touchDist = 0; // For mobile pinch zoom
 let velAz = 0, velEl = 0;
 let lastMoveTime = performance.now();
+const activePointers = new Map(); // Multi-touch tracker to isolate pinch zoom from orbit
 
 function getGroundPoint(e) {
-  const r = el.getBoundingClientRect();
+  const r = cachedCanvasRect; // Zero-reflow cached rect
   const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
   const clientY = e.clientY ?? (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
   _rayVec2.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
@@ -2689,20 +4971,29 @@ el.oncontextmenu = e => e.preventDefault();
 
 el.onpointerdown = e => {
   try { el.setPointerCapture(e.pointerId); } catch (_) {}
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   clearInterval(tmr);
   autoOrbit = false;
   velAz = 0; velEl = 0;
   lastMoveTime = performance.now();
   $('#btnOrbit').classList.remove('on');
+
+  if (activePointers.size > 1) {
+    dragMode = null;
+    downPos = null;
+    return;
+  }
+
   downPos = [e.clientX, e.clientY];
 
   if (e.button === 2 || e.shiftKey) {
     dragMode = 'orbit';
+    hideRayInspector();
     return;
   }
 
   const p = getGroundPoint(e);
-  if (!p) { dragMode = 'orbit'; return; }
+  if (!p) { dragMode = 'orbit'; hideRayInspector(); return; }
 
   const i = S.findIndex(s => Math.hypot(s.x - p[0], s.y - p[1]) < 28);
   if (i >= 0) {
@@ -2716,6 +5007,16 @@ el.onpointerdown = e => {
 };
 
 el.onpointermove = e => {
+  if (activePointers.has(e.pointerId)) {
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  }
+  if (activePointers.size > 1) {
+    dragMode = null;
+    velAz = 0;
+    velEl = 0;
+    return;
+  }
+
   lastMoveTime = performance.now();
   const p = getGroundPoint(e);
   if (p) {
@@ -2723,9 +5024,11 @@ el.onpointermove = e => {
     const nearExisting = S.some(s => Math.hypot(s.x - hoverPt[0], s.y - hoverPt[1]) < 32);
     ghostGroup.visible = !nearExisting && !dragMode && S.length < 12;
     if (ghostGroup.visible) ghostGroup.position.set(X(hoverPt[0]), 0, Z(hoverPt[1]));
+    updateRayPhysics();
   } else {
     hoverPt = null;
     ghostGroup.visible = false;
+    hideRayInspector();
   }
 
   if (!downPos) return;
@@ -2734,6 +5037,9 @@ el.onpointermove = e => {
   if (dragMode === 'pending' && Math.hypot(dx, dy) > 6) {
     dragMode = 'orbit';
     ghostGroup.visible = false;
+    hideRayInspector();
+    downPos = [e.clientX, e.clientY];
+    return;
   }
 
   if (dragMode === 'orbit') {
@@ -2741,8 +5047,10 @@ el.onpointermove = e => {
     const dEl = dy * 0.0055;
     tg.az += dAz;
     tg.el = Math.max(0.22, Math.min(1.52, tg.el + dEl));
-    velAz = dAz;
-    velEl = dEl;
+    velAz = velAz * 0.4 + dAz * 0.6;
+    velEl = velEl * 0.4 + dEl * 0.6;
+    velAz = Math.max(-0.065, Math.min(0.065, velAz));
+    velEl = Math.max(-0.045, Math.min(0.045, velEl));
     downPos = [e.clientX, e.clientY];
     camRotated = true;
     checkTutorial();
@@ -2753,10 +5061,17 @@ el.onpointermove = e => {
     S[sel].x = Math.max(15, Math.min(W - 15, p[0]));
     S[sel].y = Math.max(15, Math.min(H - 15, p[1]));
     rd();
+    updateRayPhysics();
   }
 };
 
 el.onpointerup = e => {
+  activePointers.delete(e.pointerId);
+  try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+
+  if (dragMode === 'station') {
+    invalidateShadows();
+  }
   if (dragMode === 'pending') {
     const p = getGroundPoint(e);
     if (p && S.length < 12) {
@@ -2766,23 +5081,37 @@ el.onpointerup = e => {
       rd();
     }
   }
-  if (performance.now() - lastMoveTime > 45) {
+  if (performance.now() - lastMoveTime > 85) {
     velAz = 0;
     velEl = 0;
   }
-  try { el.releasePointerCapture(e.pointerId); } catch (_) {}
   downPos = null;
   dragMode = null;
   if (isMobile) {
     hoverPt = null;
     ghostGroup.visible = false;
-    updateRayInspector();
+    hideRayInspector();
+  }
+};
+
+el.onpointercancel = e => {
+  activePointers.delete(e.pointerId);
+  try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+  downPos = null;
+  dragMode = null;
+  velAz = 0;
+  velEl = 0;
+  if (isMobile) {
+    hoverPt = null;
+    ghostGroup.visible = false;
+    hideRayInspector();
   }
 };
 
 el.onpointerleave = () => {
   hoverPt = null;
   ghostGroup.visible = false;
+  hideRayInspector();
 };
 
 el.onwheel = e => {
@@ -2793,12 +5122,14 @@ el.onwheel = e => {
 // Touch gestures: Pinch-to-zoom support for mobile devices
 el.addEventListener('touchstart', e => {
   if (e.touches.length === 2) {
+    velAz = 0; velEl = 0; dragMode = null;
     touchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
   }
 }, { passive: true });
 
 el.addEventListener('touchmove', e => {
   if (e.touches.length === 2 && touchDist > 0) {
+    velAz = 0; velEl = 0; dragMode = null;
     const curDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
     const diff = touchDist - curDist;
     tg.d = Math.max(32, Math.min(125, tg.d + diff * 0.12));
@@ -2807,7 +5138,10 @@ el.addEventListener('touchmove', e => {
 }, { passive: true });
 
 el.addEventListener('touchend', e => {
-  if (e.touches.length < 2) touchDist = 0;
+  if (e.touches.length < 2) {
+    touchDist = 0;
+    velAz = 0; velEl = 0;
+  }
 }, { passive: true });
 
 // Keyboard shortcuts
@@ -2910,19 +5244,19 @@ function deployDemoNetwork(onDone) {
   if (lv === 0) {
     // Village: 2 stations (budget 100k, cost 84k, covers ~98%, 3 stars!)
     P = [
-      {x: 290, y: 300, ch: 0, az: 30, h: 48, p: 46, mode: '3sec', tilt: 4},
-      {x: 610, y: 300, ch: 1, az: 90, h: 48, p: 46, mode: '3sec', tilt: 4}
+      {x: 290, y: 300, ch: 0, az: 30, h: 48, p: 46, mode: '3sec', tilt: 2},
+      {x: 610, y: 300, ch: 1, az: 90, h: 48, p: 46, mode: '3sec', tilt: 2}
     ];
   } else if (lv === 1) {
-    // Town: 4 stations (budget 160k, cost 141k, covers ~94%, 3 stars!)
+    // Town: 4 stations (budget 160k, cost 145.6k <= 147.2k, covers ~95%, 3 stars!)
     P = [
-      {x: 230, y: 180, ch: 0, az: 30, h: 36, p: 40, mode: '3sec', tilt: 4},
-      {x: 670, y: 180, ch: 1, az: 90, h: 36, p: 40, mode: '3sec', tilt: 4},
-      {x: 230, y: 440, ch: 2, az: 90, h: 36, p: 40, mode: '3sec', tilt: 4},
-      {x: 670, y: 440, ch: 0, az: 30, h: 36, p: 40, mode: '3sec', tilt: 4}
+      {x: 240, y: 170, ch: 0, az: 45, h: 38, p: 41, mode: '3sec', tilt: 1},
+      {x: 680, y: 170, ch: 1, az: 105, h: 38, p: 41, mode: '3sec', tilt: 1},
+      {x: 240, y: 450, ch: 2, az: 105, h: 38, p: 41, mode: '3sec', tilt: 1},
+      {x: 680, y: 450, ch: 0, az: 45, h: 38, p: 41, mode: '3sec', tilt: 1}
     ];
   } else {
-    // Dense City: 6 stations (budget 240k, cost 234k, covers ~93%, 3 stars!)
+    // Dense City: 6 stations (budget 260k, cost 235k, covers ~94%, 3 stars!)
     P = [
       {x: 200, y: 160, ch: 0, az: 30, h: 42, p: 44, mode: '3sec', tilt: 4},
       {x: 500, y: 150, ch: 1, az: 90, h: 42, p: 44, mode: '3sec', tilt: 4},
