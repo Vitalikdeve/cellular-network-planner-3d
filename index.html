@@ -405,6 +405,48 @@ section.v.on { display: block; }
 }
 .rep-congrats.on { display: block; }
 
+/* Live 3D Report Demonstration HUD Overlay */
+.demo-hud {
+  position: absolute; left: 16px; top: 16px;
+  width: min(440px, calc(100% - 32px));
+  padding: 16px 18px; border-radius: 22px; z-index: 15;
+  display: none; background: var(--glass-strong);
+  box-shadow: 0 16px 45px rgba(0,0,0,0.32);
+  animation: pop .35s cubic-bezier(.2, 1.3, .4, 1);
+  border: 1.5px solid rgba(59, 130, 246, 0.45);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.demo-hud.on { display: block; }
+.demo-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.05em; padding: 3px 10px; border-radius: 99px;
+  background: rgba(59, 130, 246, 0.16); color: var(--blue);
+  margin-bottom: 8px;
+}
+.demo-hud h3 { font-size: 16px; font-weight: 800; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.demo-hud p { font-size: 13px; color: var(--mut); line-height: 1.48; margin-bottom: 12px; }
+.demo-hud .demo-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; }
+.demo-hud .demo-actions .btn { font-size: 12.5px; padding: 7px 12px; }
+.demo-hud .demo-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  border-top: 1px solid rgba(128,128,128,0.18); padding-top: 10px; gap: 8px; flex-wrap: wrap;
+}
+.btn-demo3d {
+  background: linear-gradient(135deg, #2563eb, #3b82f6) !important;
+  color: #fff !important;
+  border: none !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35) !important;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.btn-demo3d:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45) !important;
+}
+
 footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13px; line-height: 1.6; }
 
 .card-handle { display: none; }
@@ -538,6 +580,21 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
   .rep-card { padding: 16px 18px; border-radius: 20px; }
   .rep-analogy-box { font-size: 12.5px; }
   .rep-opt-btn { font-size: 12px; }
+  .btn-demo3d { width: 100%; justify-content: center; }
+
+  /* Mobile Demo HUD */
+  .demo-hud {
+    left: 8px; right: 8px; top: 8px;
+    width: auto;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 13px 15px;
+    border-radius: 18px;
+    box-shadow: 0 12px 35px rgba(0,0,0,0.38);
+  }
+  .demo-hud h3 { font-size: 14.5px; }
+  .demo-hud p { font-size: 12.2px; margin-bottom: 8px; }
+  .demo-hud .demo-actions .btn { font-size: 11.5px; padding: 5px 9px; }
 
   footer { margin-top: 18px; font-size: 11.5px; }
 }
@@ -595,6 +652,9 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
     
     <!-- Base Station Properties Card -->
     <div class="card g" id="card"></div>
+
+    <!-- Live 3D Report Demonstration HUD Overlay -->
+    <div class="demo-hud g" id="demoHud"></div>
   </div>
 
   <div class="stats">
@@ -697,7 +757,8 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
       </div>
 
       <div class="rep-actions">
-        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Технические детали</button>
+        <button class="btn btn-demo3d" data-demo="1">🎬 Показать в 3D на поле игры</button>
+        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Формулы</button>
         <button class="btn btn-read" data-id="1">
           <span class="check-icon">○</span> Отметить как прочитано
         </button>
@@ -744,7 +805,8 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
       </div>
 
       <div class="rep-actions">
-        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Технические детали</button>
+        <button class="btn btn-demo3d" data-demo="2">🎬 Показать в 3D на поле игры</button>
+        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Формулы</button>
         <button class="btn btn-read" data-id="2">
           <span class="check-icon">○</span> Отметить как прочитано
         </button>
@@ -790,7 +852,8 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
       </div>
 
       <div class="rep-actions">
-        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Технические детали</button>
+        <button class="btn btn-demo3d" data-demo="3">🎬 Показать в 3D на поле игры</button>
+        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Формулы</button>
         <button class="btn btn-read" data-id="3">
           <span class="check-icon">○</span> Отметить как прочитано
         </button>
@@ -837,7 +900,8 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
       </div>
 
       <div class="rep-actions">
-        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Технические детали</button>
+        <button class="btn btn-demo3d" data-demo="4">🎬 Показать в 3D на поле игры</button>
+        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Формулы</button>
         <button class="btn btn-read" data-id="4">
           <span class="check-icon">○</span> Отметить как прочитано
         </button>
@@ -883,7 +947,8 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
       </div>
 
       <div class="rep-actions">
-        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Технические детали</button>
+        <button class="btn btn-demo3d" data-demo="5">🎬 Показать в 3D на поле игры</button>
+        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Формулы</button>
         <button class="btn btn-read" data-id="5">
           <span class="check-icon">○</span> Отметить как прочитано
         </button>
@@ -929,7 +994,8 @@ footer { margin-top: 26px; text-align: center; color: var(--mut); font-size: 13p
       </div>
 
       <div class="rep-actions">
-        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Технические детали</button>
+        <button class="btn btn-demo3d" data-demo="6">🎬 Показать в 3D на поле игры</button>
+        <button class="btn btn-deep" style="font-size:12px;padding:6px 12px;">🔬 Формулы</button>
         <button class="btn btn-read" data-id="6">
           <span class="check-icon">○</span> Отметить как прочитано
         </button>
@@ -1207,12 +1273,31 @@ function pl(d, h) {
 }
 
 function gain(s, x, y) {
-  if (!s.sec) return 8;
-  const a = Math.atan2(y - s.y, x - s.x) * 180 / Math.PI;
+  const mode = s.mode || (s.sec ? '3sec' : 'omni');
+  if (mode === 'omni') return 8;
+
+  const dx = x - s.x, dy = y - s.y;
+  const dist = Math.hypot(dx, dy) * KM * 1000;
+  const a = Math.atan2(dy, dx) * 180 / Math.PI;
+
+  const tilt = s.tilt || 0;
+  const elevDeg = dist > 1 ? Math.atan2(s.h, dist) * 180 / Math.PI : 45;
+  const vDiff = Math.abs(elevDeg - tilt);
+  const vertAtten = Math.min(12 * (vDiff / 10) ** 2, 20);
+
   let m = -99;
-  for (let k = 0; k < 3; k++) {
-    const d = Math.abs(((a - (s.az + k * 120)) % 360 + 540) % 360 - 180);
-    m = Math.max(m, 17 - Math.min(12 * (d / 65) ** 2, 20));
+  if (mode === '6sec') {
+    for (let k = 0; k < 6; k++) {
+      const d = Math.abs(((a - (s.az + k * 60)) % 360 + 540) % 360 - 180);
+      const horizAtten = Math.min(12 * (d / 33) ** 2, 25);
+      m = Math.max(m, 20 - horizAtten - vertAtten);
+    }
+  } else {
+    for (let k = 0; k < 3; k++) {
+      const d = Math.abs(((a - (s.az + k * 120)) % 360 + 540) % 360 - 180);
+      const horizAtten = Math.min(12 * (d / 65) ** 2, 20);
+      m = Math.max(m, 17 - horizAtten - vertAtten);
+    }
   }
   return m;
 }
@@ -1257,23 +1342,51 @@ function rx(s, x, y) {
   return s.p + gain(s, x, y) - pl(Math.hypot(dx, dy) * KM, s.h) - Math.min(w * 5, 25) + 4 * Math.sin(x * 0.045 + s.x) * Math.cos(y * 0.037 + s.y);
 }
 
+// High-speed zero-GC signal calculation (pre-allocated typed storage)
+const maxStations = 32;
+const stPowers = new Float32Array(maxStations);
+const fastSigResult = { r: -999, q: -999 };
+
 function sig(x, y) {
-  if (!S.length) return null;
+  const len = S.length;
+  if (!len) return null;
   let b = -999, bi = -1;
-  const p = S.map((s, i) => {
-    const v = rx(s, x, y);
+  for (let i = 0; i < len; i++) {
+    const v = rx(S[i], x, y);
+    stPowers[i] = v;
     if (v > b) { b = v; bi = i; }
-    return v;
-  });
+  }
   let I = 10 ** (N0 / 10);
   let worstInterfIdx = -1, worstInterfVal = -999;
-  p.forEach((v, i) => {
-    if (i !== bi && S[i].ch === S[bi].ch) {
+  const targetCh = S[bi].ch;
+  for (let i = 0; i < len; i++) {
+    if (i !== bi && S[i].ch === targetCh) {
+      const v = stPowers[i];
       I += 10 ** (v / 10);
       if (v > worstInterfVal) { worstInterfVal = v; worstInterfIdx = i; }
     }
-  });
+  }
   return { r: b, i: bi, q: b - 10 * Math.log10(I), interfIdx: worstInterfVal > -102 ? worstInterfIdx : -1, interfVal: worstInterfVal };
+}
+
+function sigFast(x, y) {
+  const len = S.length;
+  let b = -999, bi = -1;
+  for (let i = 0; i < len; i++) {
+    const v = rx(S[i], x, y);
+    stPowers[i] = v;
+    if (v > b) { b = v; bi = i; }
+  }
+  let I = 10 ** (N0 / 10);
+  const targetCh = S[bi].ch;
+  for (let i = 0; i < len; i++) {
+    if (i !== bi && S[i].ch === targetCh) {
+      I += 10 ** (stPowers[i] / 10);
+    }
+  }
+  fastSigResult.r = b;
+  fastSigResult.q = b - 10 * Math.log10(I);
+  return fastSigResult;
 }
 
 const stops = [[239, 68, 68], [245, 158, 11], [16, 185, 129], [59, 130, 246]];
@@ -1283,7 +1396,11 @@ function ramp(t) {
   return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
 }
 
-const cost = s => 12 + (s.h - 15) * 0.3 + (s.p - 30) * 0.5 + (s.sec ? 12 : 0);
+const cost = s => {
+  const mode = s.mode || (s.sec ? '3sec' : 'omni');
+  const secCost = mode === '6sec' ? 24 : mode === '3sec' ? 12 : 0;
+  return 12 + (s.h - 15) * 0.3 + (s.p - 30) * 0.5 + secCost;
+};
 
 function updateStats(ok, sum) {
   const L = LV[lv], tot = S.reduce((a, s) => a + cost(s), 0);
@@ -1328,6 +1445,11 @@ function renderPanel() {
     return;
   }
   const s = S[sel];
+  const mode = s.mode || (s.sec ? '3sec' : 'omni');
+  s.mode = mode;
+  s.sec = mode !== 'omni';
+  if (s.tilt === undefined) s.tilt = 4;
+
   c.className = 'card g on';
   $('#tut').style.display = 'none';
   c.innerHTML = `
@@ -1344,14 +1466,21 @@ function renderPanel() {
     <input type="range" min="30" max="46" value="${s.p}" data-k="p">
     <label>Высота мачты (огибание домов) <b>${s.h} м</b></label>
     <input type="range" min="15" max="60" value="${s.h}" data-k="h">
-    <label style="align-items:center;margin-top:10px;cursor:pointer">
-      <span>Направленные 3 сектора (3×120°)</span>
-      <input type="checkbox" id="sec" ${s.sec ? 'checked' : ''} style="accent-color:#3b82f6;width:18px;height:18px;cursor:pointer">
-    </label>
-    ${s.sec ? `
+
+    <label style="margin-top:10px;">Конфигурация антенн:</label>
+    <div class="pills g" style="width:100%;margin-bottom:8px;display:flex;justify-content:space-between;">
+      <button class="${mode === 'omni' ? 'on' : ''}" data-m="omni" style="flex:1;text-align:center;justify-content:center;padding:5px 4px;font-size:12px;">⭕ Omni</button>
+      <button class="${mode === '3sec' ? 'on' : ''}" data-m="3sec" style="flex:1;text-align:center;justify-content:center;padding:5px 4px;font-size:12px;">🍕 3 Сектора</button>
+      <button class="${mode === '6sec' ? 'on' : ''}" data-m="6sec" style="flex:1;text-align:center;justify-content:center;padding:5px 4px;font-size:12px;">⚡ 6 Секторов</button>
+    </div>
+
+    ${mode !== 'omni' ? `
       <label>Поворот секторов (Азимут) <b>${s.az}°</b></label>
-      <input type="range" min="0" max="119" value="${s.az}" data-k="az">
+      <input type="range" min="0" max="${mode === '6sec' ? 59 : 119}" value="${s.az}" data-k="az">
+      <label>Наклон луча вниз (Downtilt) <b>${s.tilt}°</b></label>
+      <input type="range" min="0" max="15" value="${s.tilt}" data-k="tilt">
     ` : ''}
+
     <span class="ch-title">Частотный канал (разные цвета не создают помех):</span>
     <div class="ch">
       ${CH.map((col, i) => `<button style="background:${col}" class="${s.ch == i ? 'on' : ''}" data-c="${i}">Канал ${i + 1}</button>`).join('')}
@@ -1370,6 +1499,17 @@ function renderPanel() {
       rd();
     };
   });
+  c.querySelectorAll('[data-m]').forEach(btn => {
+    btn.onclick = () => {
+      s.mode = btn.dataset.m;
+      s.sec = s.mode !== 'omni';
+      tuned = true;
+      checkTutorial();
+      renderPanel();
+      syncStations3D();
+      rd();
+    };
+  });
   c.querySelectorAll('[data-c]').forEach(b => {
     b.onclick = () => {
       s.ch = +b.dataset.c;
@@ -1380,10 +1520,6 @@ function renderPanel() {
       rd();
     };
   });
-  const secEl = $('#sec');
-  if (secEl) {
-    secEl.onchange = e => { s.sec = e.target.checked; tuned = true; checkTutorial(); renderPanel(); syncStations3D(); rd(); };
-  }
   const delEl = $('#del');
   if (delEl) {
     delEl.onclick = deleteStation;
@@ -1411,6 +1547,7 @@ function addStation(x, y, ch) {
     x: Math.max(15, Math.min(W - 15, x)),
     y: Math.max(15, Math.min(H - 15, y)),
     p: 43, h: 32, sec: true, az: 0,
+    tilt: 4, mode: '3sec',
     ch: ch ?? (S.length % 3),
     t: performance.now()
   });
@@ -1432,6 +1569,7 @@ R.setSize(gl.clientWidth || 900, gl.clientHeight || 500);
 gl.append(R.domElement);
 
 const sc = new THREE.Scene();
+sc.fog = new THREE.FogExp2(nightMode ? 0x090d16 : 0xf4f7fb, 0.0065);
 const camera = new THREE.PerspectiveCamera(40, (gl.clientWidth || 900) / (gl.clientHeight || 500), 1, 450);
 const el = R.domElement;
 
@@ -1502,6 +1640,7 @@ function createSectorWedgeGeo(radius, angleDeg) {
   return geo;
 }
 const gSectorBeam = createSectorWedgeGeo(1, 76);
+const gSectorBeam6 = createSectorWedgeGeo(1, 42);
 
 // Ghost Preview Tower on Hover
 const ghostGroup = new THREE.Group();
@@ -1564,6 +1703,7 @@ function applyTheme() {
   document.body.classList.toggle('night', nightMode);
   $('#btnTheme').textContent = nightMode ? '🌙 Неон' : '☀️ День';
   $('#btnTheme').classList.toggle('on', nightMode);
+  if (sc.fog) sc.fog.color.setHex(nightMode ? 0x090d16 : 0xf4f7fb);
   groundMat.color.setHex(nightMode ? 0x0b1120 : 0xe2e8f0);
   gridHelper.material.opacity = nightMode ? 0.35 : 0.22;
   mBDefault.map = nightMode ? bTexNight : bTexDay;
@@ -1610,6 +1750,8 @@ function syncStations3D() {
     const g = new THREE.Group();
     const col = new THREE.Color(CH[s.ch]);
     const h = s.h / 7.5;
+    const mode = s.mode || (s.sec ? '3sec' : 'omni');
+    const tiltRad = (s.tilt || 0) * Math.PI / 180;
 
     // Mast
     const tw = new THREE.Mesh(gTower, mTower);
@@ -1622,23 +1764,54 @@ function syncStations3D() {
     bc.position.y = h + 0.3;
     g.add(bc);
 
+    // Red Aviation Obstruction Warning Beacon for tall towers (h >= 30m)
+    let avBeacon = null;
+    if (s.h >= 30) {
+      avBeacon = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 12, 10),
+        new THREE.MeshBasicMaterial({ color: 0xff2222, transparent: true, opacity: 0.9 })
+      );
+      avBeacon.position.y = h + 0.55;
+      g.add(avBeacon);
+    }
+
     // 3D Volumetric Sector Cones & Antenna Panels
     const beamRadius = 6 + (s.p - 30) * 0.55;
-    if (s.sec) {
+    if (mode === '6sec') {
+      for (let k = 0; k < 6; k++) {
+        const a = (s.az + k * 60) * Math.PI / 180;
+        const p = new THREE.Mesh(gPanel, new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.5 }));
+        p.position.set(Math.cos(a) * 0.42, h - 0.15, Math.sin(a) * 0.42);
+        p.rotation.y = -a;
+        p.rotation.x = tiltRad;
+        g.add(p);
+
+        const wedge = new THREE.Mesh(
+          gSectorBeam6,
+          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: nightMode ? 0.16 : 0.12, side: THREE.DoubleSide, depthWrite: false })
+        );
+        wedge.scale.setScalar(beamRadius);
+        wedge.rotation.y = -a;
+        wedge.rotation.x = tiltRad;
+        wedge.position.y = 0.08;
+        g.add(wedge);
+      }
+    } else if (mode === '3sec') {
       for (let k = 0; k < 3; k++) {
         const a = (s.az + k * 120) * Math.PI / 180;
         const p = new THREE.Mesh(gPanel, new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.5 }));
         p.position.set(Math.cos(a) * 0.42, h - 0.15, Math.sin(a) * 0.42);
         p.rotation.y = -a;
+        p.rotation.x = tiltRad;
         g.add(p);
 
-        // Volumetric 3D Sector Beam Wedge on Ground/Air
         const wedge = new THREE.Mesh(
           gSectorBeam,
           new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: nightMode ? 0.16 : 0.12, side: THREE.DoubleSide, depthWrite: false })
         );
         wedge.scale.setScalar(beamRadius);
         wedge.rotation.y = -a;
+        wedge.rotation.x = tiltRad;
         wedge.position.y = 0.08;
         g.add(wedge);
       }
@@ -1667,29 +1840,51 @@ function syncStations3D() {
       g.add(sr);
     }
 
-    g.userData = { s, rings, h };
+    g.userData = { s, rings, h, avBeacon };
     g.position.set(X(s.x), 0, Z(s.y));
     SG.add(g);
   });
 }
+
+let cachedHeatmapImageData = null;
 
 function computeHeatmapAndSubscribers() {
   hx.clearRect(0, 0, GW, GH);
   let ok = 0, sum = 0;
 
   if (S.length) {
-    const im = hx.createImageData(GW, GH);
+    if (!cachedHeatmapImageData) {
+      cachedHeatmapImageData = hx.createImageData(GW, GH);
+    }
+    const d = cachedHeatmapImageData.data;
+    const isRsrp = layer === 'rsrp';
+    let ptr = 0;
     for (let gy = 0; gy < GH; gy++) {
+      const cy = gy * C + C / 2;
       for (let gx = 0; gx < GW; gx++) {
-        const g = sig(gx * C + C / 2, gy * C + C / 2);
-        const t = layer === 'rsrp' ? (g.r + 115) / 50 : (g.q + 5) / 30;
-        const c = ramp(t);
-        const weak = layer === 'rsrp' ? g.r < -105 : g.q < 0;
+        const cx = gx * C + C / 2;
+        const g = sigFast(cx, cy);
+        const t = isRsrp ? (g.r + 115) / 50 : (g.q + 5) / 30;
+
+        const clampedT = Math.max(0, Math.min(1, t)) * 3;
+        const seg = Math.min(2, clampedT | 0);
+        const f = clampedT - seg;
+        const a = stops[seg], b = stops[seg + 1];
+        const r = (a[0] + (b[0] - a[0]) * f) | 0;
+        const gCol = (a[1] + (b[1] - a[1]) * f) | 0;
+        const bCol = (a[2] + (b[2] - a[2]) * f) | 0;
+
+        const weak = isRsrp ? g.r < -105 : g.q < 0;
         const alpha = nightMode ? (weak ? 115 : 175) : (weak ? 135 : 185);
-        im.data.set([c[0], c[1], c[2], alpha], (gy * GW + gx) * 4);
+
+        d[ptr]     = r;
+        d[ptr + 1] = gCol;
+        d[ptr + 2] = bCol;
+        d[ptr + 3] = alpha;
+        ptr += 4;
       }
     }
-    hx.putImageData(im, 0, 0);
+    hx.putImageData(cachedHeatmapImageData, 0, 0);
   }
   tex.needsUpdate = true;
 
@@ -1707,7 +1902,8 @@ function computeHeatmapAndSubscribers() {
     if (good) {
       ok++;
       const st = S[g.i];
-      const sectorUsers = Math.max(1, connectedCount[g.i] / (st && st.sec ? 3 : 1));
+      const sectorDiv = st ? (st.mode === '6sec' ? 6 : (st.sec || st.mode === '3sec') ? 3 : 1) : 1;
+      const sectorUsers = Math.max(1, connectedCount[g.i] / sectorDiv);
       u.rate = 10 * Math.log2(1 + 10 ** (g.q / 10)) * 0.75 / sectorUsers;
       sum += u.rate;
     } else {
@@ -1886,6 +2082,16 @@ function loop(now) {
     }
   }
 
+  // Touch Momentum Inertia gliding
+  if (dragMode !== 'orbit' && !autoOrbit) {
+    if (Math.abs(velAz) > 0.0001 || Math.abs(velEl) > 0.0001) {
+      tg.az += velAz;
+      tg.el = Math.max(0.22, Math.min(1.52, tg.el + velEl));
+      velAz *= 0.92;
+      velEl *= 0.92;
+    }
+  }
+
   // Smooth Camera Damping
   if (autoOrbit) tg.az += dt * 0.28;
   const k = 1 - Math.exp(-dt * 11);
@@ -1895,6 +2101,14 @@ function loop(now) {
   cam.tx += (tg.tx - cam.tx) * k;
   cam.tz += (tg.tz - cam.tz) * k;
   placeCam();
+
+  // Animate Aviation Obstacle Warning Beacons on tall towers
+  const beaconBlink = (Math.sin(now * 0.005) > 0.2);
+  SG.children.forEach(g => {
+    if (g.userData.avBeacon) {
+      g.userData.avBeacon.material.color.setHex(beaconBlink ? 0xff2222 : 0x440000);
+    }
+  });
 
   // Animate Buildings Spring Growth
   BG.children.forEach(grp => {
@@ -1960,6 +2174,7 @@ new ResizeObserver(() => {
 const rc = new THREE.Raycaster();
 let downPos = null, dragMode = null; // 'station' | 'orbit' | 'pending' | null
 let touchDist = 0; // For mobile pinch zoom
+let velAz = 0, velEl = 0;
 
 function getGroundPoint(e) {
   const r = el.getBoundingClientRect();
@@ -1979,6 +2194,7 @@ el.onpointerdown = e => {
   try { el.setPointerCapture(e.pointerId); } catch (_) {}
   clearInterval(tmr);
   autoOrbit = false;
+  velAz = 0; velEl = 0;
   $('#btnOrbit').classList.remove('on');
   downPos = [e.clientX, e.clientY];
 
@@ -2022,8 +2238,12 @@ el.onpointermove = e => {
   }
 
   if (dragMode === 'orbit') {
-    tg.az -= dx * 0.0065;
-    tg.el = Math.max(0.22, Math.min(1.52, tg.el + dy * 0.0055));
+    const dAz = -dx * 0.0065;
+    const dEl = dy * 0.0055;
+    tg.az += dAz;
+    tg.el = Math.max(0.22, Math.min(1.52, tg.el + dEl));
+    velAz = dAz;
+    velEl = dEl;
     downPos = [e.clientX, e.clientY];
     camRotated = true;
     checkTutorial();
@@ -2169,7 +2389,7 @@ $('#reset').onclick = () => {
 };
 
 // Adaptive Demo Network for Current Level (Engineered for 3 Stars)
-$('#demo').onclick = () => {
+function deployDemoNetwork(onDone) {
   clearInterval(tmr);
   S = []; sel = null;
   renderPanel();
@@ -2179,32 +2399,36 @@ $('#demo').onclick = () => {
   if (lv === 0) {
     // Village: 2 stations (budget 100k, cost 84k, covers ~98%, 3 stars!)
     P = [
-      {x: 290, y: 300, ch: 0, az: 30, h: 48, p: 46},
-      {x: 610, y: 300, ch: 1, az: 90, h: 48, p: 46}
+      {x: 290, y: 300, ch: 0, az: 30, h: 48, p: 46, mode: '3sec', tilt: 4},
+      {x: 610, y: 300, ch: 1, az: 90, h: 48, p: 46, mode: '3sec', tilt: 4}
     ];
   } else if (lv === 1) {
     // Town: 4 stations (budget 160k, cost 141k, covers ~94%, 3 stars!)
     P = [
-      {x: 230, y: 180, ch: 0, az: 30, h: 36, p: 40},
-      {x: 670, y: 180, ch: 1, az: 90, h: 36, p: 40},
-      {x: 230, y: 440, ch: 2, az: 90, h: 36, p: 40},
-      {x: 670, y: 440, ch: 0, az: 30, h: 36, p: 40}
+      {x: 230, y: 180, ch: 0, az: 30, h: 36, p: 40, mode: '3sec', tilt: 4},
+      {x: 670, y: 180, ch: 1, az: 90, h: 36, p: 40, mode: '3sec', tilt: 4},
+      {x: 230, y: 440, ch: 2, az: 90, h: 36, p: 40, mode: '3sec', tilt: 4},
+      {x: 670, y: 440, ch: 0, az: 30, h: 36, p: 40, mode: '3sec', tilt: 4}
     ];
   } else {
     // Dense City: 6 stations (budget 240k, cost 234k, covers ~93%, 3 stars!)
     P = [
-      {x: 200, y: 160, ch: 0, az: 30, h: 42, p: 44},
-      {x: 500, y: 150, ch: 1, az: 90, h: 42, p: 44},
-      {x: 750, y: 180, ch: 2, az: 30, h: 42, p: 44},
-      {x: 200, y: 440, ch: 1, az: 90, h: 42, p: 44},
-      {x: 500, y: 450, ch: 2, az: 30, h: 42, p: 44},
-      {x: 750, y: 440, ch: 0, az: 90, h: 42, p: 44}
+      {x: 200, y: 160, ch: 0, az: 30, h: 42, p: 44, mode: '3sec', tilt: 4},
+      {x: 500, y: 150, ch: 1, az: 90, h: 42, p: 44, mode: '3sec', tilt: 4},
+      {x: 750, y: 180, ch: 2, az: 30, h: 42, p: 44, mode: '3sec', tilt: 4},
+      {x: 200, y: 440, ch: 1, az: 90, h: 42, p: 44, mode: '3sec', tilt: 4},
+      {x: 500, y: 450, ch: 2, az: 30, h: 42, p: 44, mode: '3sec', tilt: 4},
+      {x: 750, y: 440, ch: 0, az: 90, h: 42, p: 44, mode: '3sec', tilt: 4}
     ];
   }
 
   let k = 0;
   tmr = setInterval(() => {
-    if (k >= P.length) { clearInterval(tmr); return; }
+    if (k >= P.length) {
+      clearInterval(tmr);
+      if (onDone) onDone();
+      return;
+    }
     const p = P[k++];
     addStation(p.x, p.y, p.ch);
     if (sel != null && S[sel]) {
@@ -2212,11 +2436,17 @@ $('#demo').onclick = () => {
       S[sel].p = p.p;
       S[sel].az = p.az;
       S[sel].sec = true;
+      S[sel].mode = p.mode || '3sec';
+      S[sel].tilt = p.tilt || 4;
     }
     sel = null;
     renderPanel();
     rd();
   }, 380);
+}
+
+$('#demo').onclick = () => {
+  deployDemoNetwork();
 };
 
 $('#tabs').onclick = e => {
@@ -2486,6 +2716,385 @@ function initInteractiveReport() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
   }
+
+  // ================= LIVE 3D REPORT DEMONSTRATIONS =================
+  let demoSpinInterval = null;
+
+  function closeDemoHud() {
+    if (demoSpinInterval) { clearInterval(demoSpinInterval); demoSpinInterval = null; }
+    const hud = $('#demoHud');
+    if (hud) hud.className = 'demo-hud g';
+    serveLine.visible = false;
+    interfLine.visible = false;
+    targetMarker.visible = false;
+    hoverPt = null;
+    updateRayInspector();
+  }
+
+  function runChapterDemo(stepId) {
+    closeDemoHud();
+
+    // Auto mark step as read in report
+    if (!repState.includes(stepId)) {
+      repState.push(stepId);
+      updateUI();
+    }
+
+    // Switch view to Game
+    document.querySelectorAll('.v').forEach(v => v.classList.toggle('on', v.id === 'game'));
+    [...$('#tabs').children].forEach(b => b.classList.toggle('on', b.dataset.t === 'game'));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Hide station card & tutorial modal
+    $('#tut').style.display = 'none';
+    $('#card').className = 'card g';
+    sel = null;
+
+    const hud = $('#demoHud');
+    hud.className = 'demo-hud g on';
+
+    if (stepId === 1) {
+      setLv(0);
+      S = [];
+      addStation(W / 2, H / 2, 0);
+      S[0].p = 43; S[0].h = 32; S[0].mode = '3sec'; S[0].sec = true; S[0].tilt = 4;
+      layer = 'rsrp';
+      $('#lay').children[0].classList.add('on');
+      $('#lay').children[1].classList.remove('on');
+      liveTraffic = true;
+      $('#btnLive').classList.add('on');
+      tg.az = 0.58; tg.el = 0.56; tg.d = 62; tg.tx = 0; tg.tz = 0;
+      autoOrbit = false;
+      $('#btnOrbit').classList.remove('on');
+
+      hud.innerHTML = `
+        <div class="demo-badge">🎬 3D-ДЕМОНСТРАЦИЯ · РАЗДЕЛ 1/6</div>
+        <h3>
+          <span>📡 Радиоволна и поток данных</span>
+          <button class="btn" id="btnCloseDemo" style="padding:2px 8px;font-size:12px;">✕</button>
+        </h3>
+        <p>
+          Базовая станция в центре города излучает электромагнитные волны 1800 МГц (светящиеся кольца). Смартфоны жителей принимают сигнал и обмениваются пакетами данных (светящиеся частицы).
+        </p>
+        <div class="demo-actions">
+          <button class="btn on" id="demo1TogLayer">📶 Переключить RSRP / SINR</button>
+          <button class="btn" id="demo1BoostPwr">⚡ Усилить передатчик (46 дБм)</button>
+        </div>
+        <div class="demo-footer">
+          <button class="btn" id="demoBackRep">◀ В доклад</button>
+          <button class="btn pri" id="demoNextStep">Далее: Радиотень ➔</button>
+        </div>
+      `;
+
+      $('#demo1TogLayer').onclick = () => {
+        layer = layer === 'rsrp' ? 'sinr' : 'rsrp';
+        $('#demo1TogLayer').textContent = layer === 'rsrp' ? '📶 RSRP (Мощность)' : '⚡ SINR (Чистота)';
+        $('#lay').children[0].classList.toggle('on', layer === 'rsrp');
+        $('#lay').children[1].classList.toggle('on', layer === 'sinr');
+        rd();
+      };
+      $('#demo1BoostPwr').onclick = () => {
+        if (S[0]) {
+          S[0].p = S[0].p === 46 ? 33 : 46;
+          $('#demo1BoostPwr').textContent = S[0].p === 46 ? '🔋 Снизить передатчик (33 дБм)' : '⚡ Усилить передатчик (46 дБм)';
+          syncStations3D(); rd();
+        }
+      };
+    } else if (stepId === 2) {
+      setLv(2);
+      S = [];
+      addStation(220, 240, 0);
+      S[0].p = 43; S[0].h = 16; S[0].sec = false; S[0].mode = 'omni';
+      layer = 'rsrp';
+      $('#lay').children[0].classList.add('on');
+      $('#lay').children[1].classList.remove('on');
+      tg.az = 0.95; tg.el = 0.42; tg.d = 48; tg.tx = -15; tg.tz = 5;
+      autoOrbit = false;
+      $('#btnOrbit').classList.remove('on');
+
+      const targetUser = U.find(u => u.x > 300 && u.x < 420 && u.y > 220 && u.y < 320) || U[0];
+      if (targetUser) {
+        hoverPt = [targetUser.x, targetUser.y];
+        updateRayInspector();
+      }
+
+      hud.innerHTML = `
+        <div class="demo-badge">🎬 3D-ДЕМОНСТРАЦИЯ · РАЗДЕЛ 2/6</div>
+        <h3>
+          <span>🧱 Радиотень от небоскреба</span>
+          <button class="btn" id="btnCloseDemo" style="padding:2px 8px;font-size:12px;">✕</button>
+        </h3>
+        <p>
+          Прямой радиолуч перекрыт высотным зданием (красный луч со штрафом <b>−5 дБ</b>). Абонент позади здания остался без связи. Поднимите мачту с 16 до 55 метров, чтобы радиоволна перешагнула крышу!
+        </p>
+        <div class="demo-actions">
+          <button class="btn pri" id="demo2Raise">🗼 Поднять мачту на 55 м (Обогнуть крышу)</button>
+          <button class="btn" id="demo2Lower">🏢 Опустить мачту на 16 м (В тень)</button>
+        </div>
+        <div class="demo-footer">
+          <button class="btn" id="demoBackRep">◀ В доклад</button>
+          <button class="btn pri" id="demoNextStep">Далее: Секторы ➔</button>
+        </div>
+      `;
+
+      $('#demo2Raise').onclick = () => {
+        if (S[0]) {
+          S[0].h = 55; tg.el = 0.65; syncStations3D(); rd();
+          if (targetUser) { hoverPt = [targetUser.x, targetUser.y]; updateRayInspector(); }
+        }
+      };
+      $('#demo2Lower').onclick = () => {
+        if (S[0]) {
+          S[0].h = 16; tg.el = 0.42; syncStations3D(); rd();
+          if (targetUser) { hoverPt = [targetUser.x, targetUser.y]; updateRayInspector(); }
+        }
+      };
+    } else if (stepId === 3) {
+      setLv(0);
+      S = [];
+      addStation(W / 2, H / 2, 0);
+      S[0].p = 43; S[0].h = 35; S[0].sec = true; S[0].mode = '3sec'; S[0].az = 0; S[0].tilt = 5;
+      layer = 'rsrp';
+      $('#lay').children[0].classList.add('on');
+      $('#lay').children[1].classList.remove('on');
+      tg.az = 0.45; tg.el = 0.85; tg.d = 60; tg.tx = 0; tg.tz = 0;
+      autoOrbit = false;
+      $('#btnOrbit').classList.remove('on');
+
+      hud.innerHTML = `
+        <div class="demo-badge">🎬 3D-ДЕМОНСТРАЦИЯ · РАЗДЕЛ 3/6</div>
+        <h3>
+          <span>🍕 Секторизация: 3×120° vs 6×60° vs Omni</span>
+          <button class="btn" id="btnCloseDemo" style="padding:2px 8px;font-size:12px;">✕</button>
+        </h3>
+        <p>
+          Вместо ненаправленной лампы (Omni) секторные антенны фокусируют энергию в лепестки (угол 65°), утраивая емкость соты. Включите вращение азимута или режим 6 секторов!
+        </p>
+        <div class="demo-actions">
+          <button class="btn on" id="demo3Sec3">🍕 3 Сектора (3×120°)</button>
+          <button class="btn" id="demo3Sec6">⚡ 6 Секторов (6×60°)</button>
+          <button class="btn" id="demo3Omni">⭕ Omni (360°)</button>
+          <button class="btn pri" id="demo3Spin">🔄 Вращать азимут (360°)</button>
+        </div>
+        <div class="demo-footer">
+          <button class="btn" id="demoBackRep">◀ В доклад</button>
+          <button class="btn pri" id="demoNextStep">Далее: Интерференция ➔</button>
+        </div>
+      `;
+
+      $('#demo3Sec3').onclick = () => {
+        if (S[0]) {
+          S[0].mode = '3sec'; S[0].sec = true;
+          $('#demo3Sec3').classList.add('on');
+          $('#demo3Sec6').classList.remove('on');
+          $('#demo3Omni').classList.remove('on');
+          syncStations3D(); rd();
+        }
+      };
+      $('#demo3Sec6').onclick = () => {
+        if (S[0]) {
+          S[0].mode = '6sec'; S[0].sec = true;
+          $('#demo3Sec6').classList.add('on');
+          $('#demo3Sec3').classList.remove('on');
+          $('#demo3Omni').classList.remove('on');
+          syncStations3D(); rd();
+        }
+      };
+      $('#demo3Omni').onclick = () => {
+        if (S[0]) {
+          S[0].mode = 'omni'; S[0].sec = false;
+          $('#demo3Omni').classList.add('on');
+          $('#demo3Sec3').classList.remove('on');
+          $('#demo3Sec6').classList.remove('on');
+          syncStations3D(); rd();
+        }
+      };
+      $('#demo3Spin').onclick = () => {
+        if (demoSpinInterval) {
+          clearInterval(demoSpinInterval); demoSpinInterval = null;
+          $('#demo3Spin').textContent = '🔄 Вращать азимут (360°)';
+        } else {
+          $('#demo3Spin').textContent = '⏸ Остановить вращение';
+          demoSpinInterval = setInterval(() => {
+            if (S[0]) {
+              S[0].az = (S[0].az + 3) % (S[0].mode === '6sec' ? 60 : 120);
+              syncStations3D(); rd();
+            }
+          }, 50);
+        }
+      };
+    } else if (stepId === 4) {
+      setLv(1);
+      S = [];
+      addStation(320, 300, 0); // Tower 1, F1 (Blue)
+      addStation(580, 300, 0); // Tower 2, F1 (Blue)
+      S[0].mode = '3sec'; S[1].mode = '3sec';
+      layer = 'sinr';
+      $('#lay').children[0].classList.remove('on');
+      $('#lay').children[1].classList.add('on');
+      tg.az = 0.05; tg.el = 0.88; tg.d = 72; tg.tx = 0; tg.tz = 0;
+      autoOrbit = false;
+      $('#btnOrbit').classList.remove('on');
+
+      hud.innerHTML = `
+        <div class="demo-badge">🎬 3D-ДЕМОНСТРАЦИЯ · РАЗДЕЛ 4/6</div>
+        <h3>
+          <span>⚡ Шумная вечеринка: Интерференция F1 vs F1</span>
+          <button class="btn" id="btnCloseDemo" style="padding:2px 8px;font-size:12px;">✕</button>
+        </h3>
+        <p>
+          Обе вышки вещают на <b>Канале 1 (синий)</b>. Посередине их радиосигналы сталкиваются и глушат друг друга (глубокая красная зона SINR &lt; 0 дБ). Нажмите «Развести каналы»!
+        </p>
+        <div class="demo-actions">
+          <button class="btn pri" id="demo4Split">🎨 Развести каналы: F1 (Синий) + F2 (Оранжевый)</button>
+          <button class="btn danger" id="demo4Clash">⚠️ Столкнуть на один Канал 1 (Красная помеха)</button>
+        </div>
+        <div class="demo-footer">
+          <button class="btn" id="demoBackRep">◀ В доклад</button>
+          <button class="btn pri" id="demoNextStep">Далее: Шеннон ➔</button>
+        </div>
+      `;
+
+      $('#demo4Split').onclick = () => {
+        if (S[1]) {
+          S[1].ch = 1; // Channel 2 (Orange)
+          syncStations3D(); rd();
+        }
+      };
+      $('#demo4Clash').onclick = () => {
+        if (S[1]) {
+          S[1].ch = 0; // Channel 1 (Blue)
+          syncStations3D(); rd();
+        }
+      };
+    } else if (stepId === 5) {
+      setLv(0);
+      S = [];
+      addStation(W / 2, H / 2, 0);
+      S[0].p = 44; S[0].h = 36; S[0].mode = '3sec';
+      layer = 'sinr';
+      $('#lay').children[0].classList.remove('on');
+      $('#lay').children[1].classList.add('on');
+
+      U.length = 0;
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        U.push({ x: W / 2 + Math.cos(a) * 120, y: H / 2 + Math.sin(a) * 90, vx: 0, vy: 0, g: null, rate: 0 });
+      }
+      build3dScene(); rd();
+
+      tg.az = 0.52; tg.el = 0.65; tg.d = 65; tg.tx = 0; tg.tz = 0;
+      autoOrbit = false;
+      $('#btnOrbit').classList.remove('on');
+
+      hud.innerHTML = `
+        <div class="demo-badge">🎬 3D-ДЕМОНСТРАЦИЯ · РАЗДЕЛ 5/6</div>
+        <h3>
+          <span>🚀 Формула Шеннона: Деление емкости соты</span>
+          <button class="btn" id="btnCloseDemo" style="padding:2px 8px;font-size:12px;">✕</button>
+        </h3>
+        <p>
+          Емкость соты ограничена полосой (10 МГц). Сейчас на вышке всего 6 абонентов — скорость каждого <b>~6.5 Мбит/с</b>. Нажмите «Нагнать толпу» и посмотрите, как скорость делится на всех!
+        </p>
+        <div class="demo-actions">
+          <button class="btn danger" id="demo5Crowd">👥 Нагнать толпу (42 абонента на концерт)</button>
+          <button class="btn" id="demo5Few">👤 Мало людей (6 абонентов)</button>
+          <button class="btn pri" id="demo5SixSec">⚡ 6 Секторов (Разгрузить толпу)</button>
+        </div>
+        <div class="demo-footer">
+          <button class="btn" id="demoBackRep">◀ В доклад</button>
+          <button class="btn pri" id="demoNextStep">Далее: Победа 3★ ➔</button>
+        </div>
+      `;
+
+      $('#demo5Crowd').onclick = () => {
+        U.length = 0;
+        for (let i = 0; i < 42; i++) {
+          const a = Math.random() * Math.PI * 2, r = 40 + Math.random() * 160;
+          U.push({ x: W / 2 + Math.cos(a) * r, y: H / 2 + Math.sin(a) * (r * 0.7), vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, g: null, rate: 0 });
+        }
+        build3dScene(); rd();
+      };
+      $('#demo5Few').onclick = () => {
+        U.length = 0;
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          U.push({ x: W / 2 + Math.cos(a) * 120, y: H / 2 + Math.sin(a) * 90, vx: 0, vy: 0, g: null, rate: 0 });
+        }
+        build3dScene(); rd();
+      };
+      $('#demo5SixSec').onclick = () => {
+        if (S[0]) {
+          S[0].mode = S[0].mode === '6sec' ? '3sec' : '6sec';
+          $('#demo5SixSec').textContent = S[0].mode === '6sec' ? '🍕 3 Сектора' : '⚡ 6 Секторов (Удвоить)';
+          syncStations3D(); rd();
+        }
+      };
+    } else if (stepId === 6) {
+      setLv(0);
+      deployDemoNetwork(() => {
+        autoOrbit = true;
+        $('#btnOrbit').classList.add('on');
+        tg.az = 0.3; tg.el = 0.65; tg.d = 75;
+      });
+
+      hud.innerHTML = `
+        <div class="demo-badge">🎬 3D-ДЕМОНСТРАЦИЯ · РАЗДЕЛ 6/6</div>
+        <h3>
+          <span>🏆 Идеальная сеть на высший балл 3★</span>
+          <button class="btn" id="btnCloseDemo" style="padding:2px 8px;font-size:12px;">✕</button>
+        </h3>
+        <p>
+          Перед вами идеальный план: 100% абонентов на сверхскорости, частоты разведены (F1, F2, F3 не пересекаются), а бюджет сэкономлен. Теперь постройте свою сеть сами!
+        </p>
+        <div class="demo-actions">
+          <button class="btn pri" id="demo6Build">🎮 Начать проектировать свою сеть</button>
+          <button class="btn" id="demo6NextLvl">🗺 Следующий уровень (Улица)</button>
+        </div>
+        <div class="demo-footer">
+          <button class="btn" id="demoBackRep">◀ Вернуться к докладу</button>
+        </div>
+      `;
+
+      $('#demo6Build').onclick = () => {
+        closeDemoHud();
+        S.length = 0;
+        rd();
+      };
+      $('#demo6NextLvl').onclick = () => {
+        setLv((lv + 1) % LV.length);
+        deployDemoNetwork();
+      };
+    }
+
+    const btnClose = $('#btnCloseDemo');
+    if (btnClose) btnClose.onclick = closeDemoHud;
+
+    const btnBack = $('#demoBackRep');
+    if (btnBack) {
+      btnBack.onclick = () => {
+        closeDemoHud();
+        document.querySelectorAll('.v').forEach(v => v.classList.toggle('on', v.id === 'report'));
+        [...$('#tabs').children].forEach(b => b.classList.toggle('on', b.dataset.t === 'report'));
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+    }
+
+    const btnNext = $('#demoNextStep');
+    if (btnNext) {
+      btnNext.onclick = () => {
+        if (stepId < 6) runChapterDemo(stepId + 1);
+      };
+    }
+  }
+
+  // Hook all 3D Demo Buttons in cards
+  document.querySelectorAll('.btn-demo3d').forEach(btn => {
+    btn.onclick = () => {
+      const stepId = +btn.dataset.demo;
+      runChapterDemo(stepId);
+    };
+  });
 
   updateUI();
 }
